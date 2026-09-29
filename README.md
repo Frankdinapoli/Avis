@@ -25,20 +25,24 @@ Ogni volta che apri l'app (o torni su di essa, e ogni 30 minuti mentre è aperta
 
 ### Come funziona la ricerca
 
-In danese le parole composte finiscono con il prodotto vero e proprio: `hytteost` è un formaggio, `ostehaps` no. Per questo un'offerta conta come "il prodotto" se la parola cercata è una parola intera o la fine di una parola composta. Se la parola cercata è solo all'inizio (`mælkechokolade`), l'offerta viene mostrata come *correlato* e non viene scelta in automatico. Alcuni falsi amici (`pålæg` per `æg`, `frost` per `ost`, …) sono esclusi; li trovi in `index.html` insieme al dizionario italiano → danese.
+Il codice è in `match.js` (con il dizionario italiano → danese e i falsi amici). Prima la pertinenza, poi il prezzo:
+
+- In danese il prodotto è l'ultima parola della frase (`Samsø nemme kartofler` sono patate, non formaggio) e in una parola composta è la fine (`hytteost` è formaggio, `ostehaps` no). I titoli si dividono su `eller`, `og`, `,`, `/`, `&`, `+`; quello che segue `med`, `i`, `til`, `af`, `uden` è un ingrediente, quindi solo *correlato*.
+- Forme come `kyllingebrystfilet` valgono come `kyllingebryst`; il pålæg (affettati), i menu, le offerte condizionate e le unità diverse da quella dominante (kaffe: kg, non stk) diventano *correlato*.
+- Quantità ovunque nella riga: `500g kyllingebryst`, `1,5 l mælk`, `6 stk æg`, `2x kaffe`. Con una quantità le offerte sono ordinate per costo stimato (confezioni necessarie × prezzo, o prezzo al kg × quantità se il formato varia) e mostrano ad es. `500 g ≈ 36,00 kr`.
+- Refusi tollerati solo su parole intere, mai sulla fine di un composto.
+
+Test: `node tests/run.mjs` (casi in `tests/cases.json`, offerte congelate in `tests/fixture.json`).
 
 ## Da terminale (`avis.py`)
 
 Serve solo Python 3, nessuna dipendenza.
 
 ```sh
-python3 avis.py lista-esempio.txt   # confronta la lista
-python3 avis.py cerca kaffe         # cerca tra tutte le offerte
 python3 avis.py aggiorna            # riscarica le offerte (cache in data/, 6 ore)
-python3 avis.py artifact out.html   # copia di index.html con le offerte incorporate
+python3 avis.py storico             # aggiunge le offerte attuali a data/history.json
+python3 avis.py artifact out.html   # copia di index.html con offerte e match.js incorporati
 ```
-
-Aggiungi `--desc` per cercare anche nella descrizione delle offerte.
 
 ## Note
 
