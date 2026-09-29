@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--APP-START-->
+<title>Avis Tilbud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: list editor + per-item offer comparison on the left, a receipt-style
+   summary (where to shop, totals per store) pinned on the right; one column on phones. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #17201d;
+  --muted: #5d6b66;
+  --line: #d9e0dd;
+  --accent: #c8102e;          /* Dannebrog red, used sparingly */
+  --accent-soft: #fbe8eb;
+  --good: #1d7a4c;
+  --good-soft: #e3f3ea;
+  --warn: #9a6200;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111615; --surface: #1a211f; --ink: #e7eeeb; --muted: #97a6a0; --line: #2d3734;
+    --accent: #ff5a6e; --accent-soft: #3a1c22; --good: #5fd39a; --good-soft: #163426; --warn: #f0b44c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111615; --surface: #1a211f; --ink: #e7eeeb; --muted: #97a6a0; --line: #2d3734;
+  --accent: #ff5a6e; --accent-soft: #3a1c22; --good: #5fd39a; --good-soft: #163426; --warn: #f0b44c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 var(--font-body);
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; }
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 20px; }
+h1 { font: 700 clamp(28px, 5vw, 40px)/1 var(--font-display); margin: 0; letter-spacing: -0.02em; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 60ch; }
+h2 { font: 700 18px/1.2 var(--font-display); margin: 0; text-wrap: balance; }
+.label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--muted); }
+button, .btn {
+  font: 500 14px/1 var(--font-body); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button.link { border: 0; background: none; padding: 4px 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+button[disabled] { opacity: .5; cursor: wait; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } .summary { order: -1; } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.editor { display: grid; gap: 10px; margin-bottom: 20px; }
+.editor-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+textarea {
+  width: 100%; min-height: 150px; resize: vertical; padding: 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  font: 14px/1.6 var(--font-mono);
+}
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.hint code { font-family: var(--font-mono); font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.stores { display: flex; flex-wrap: wrap; gap: 6px; }
+.store-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font-size: 13px; }
+.store-toggle[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+select { font: 13px var(--font-body); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+
+.items { display: grid; gap: 12px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.item-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.item-head .q { font: 700 17px/1.2 var(--font-display); }
+.item-head .tr { font-size: 13px; color: var(--muted); }
+.item-head .best { font-size: 13px; color: var(--muted); }
+.item.missing .item-head { border-bottom: 0; }
+.missing-note { color: var(--warn); font-size: 13px; }
+.offers { list-style: none; margin: 0; padding: 0; }
+.offer {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 10px 16px; border-top: 1px solid var(--line); cursor: pointer;
+}
+.offer:first-child { border-top: 0; }
+.offer:hover { background: var(--bg); }
+.offer.chosen { background: var(--good-soft); }
+.offer:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: contain; background: #fff; border: 1px solid var(--line); }
+.thumb.none { display: grid; place-items: center; font-size: 11px; color: var(--muted); background: var(--bg); }
+.o-main { min-width: 0; }
+.o-title { font-weight: 600; overflow-wrap: anywhere; }
+.o-meta { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; }
+.o-desc { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+.tag.ok { background: var(--good-soft); color: var(--good); }
+.o-price { text-align: right; }
+.o-price .p { font: 500 17px/1.1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.o-price .pre { font-size: 12px; color: var(--muted); text-decoration: line-through; font-family: var(--font-mono); }
+.o-price .u { font-size: 12px; color: var(--muted); font-family: var(--font-mono); white-space: nowrap; }
+.more { padding: 8px 16px 12px; border-top: 1px solid var(--line); }
+
+/* Receipt-style summary */
+.summary { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+main { min-width: 0; }
+@media (max-width: 900px) { .summary { position: static; } }
+.receipt { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; font-family: var(--font-mono); font-size: 13px; }
+.receipt h2 { font-family: var(--font-display); margin-bottom: 4px; }
+.receipt .rule { border-top: 1px dashed var(--line); margin: 10px 0; }
+.r-row { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.r-row .l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-store { font-family: var(--font-body); font-weight: 600; display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.r-total { font-size: 18px; font-weight: 500; }
+.r-muted { color: var(--muted); }
+table.stores-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.stores-tbl th { text-align: left; font: 600 11px var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 4px 0; }
+.stores-tbl td { padding: 6px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.stores-tbl td.n { text-align: right; font-family: var(--font-mono); }
+.stores-tbl tr.top td { font-weight: 600; }
+
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: 600; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.search-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.search-row input { flex: 1 1 220px; min-width: 0; font: 15px var(--font-body); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.empty { color: var(--muted); padding: 24px 16px; text-align: center; }
+.error { color: var(--accent); }
+footer { margin-top: 32px; font-size: 12px; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .offer { transition: background .12s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Avis <span>Tilbud</span></h1>
+      <p class="sub">Le offerte dei volantini di Lidl, Føtex, Bilka, Netto e REMA 1000, confrontate sulla tua lista della spesa.</p>
+    </div>
+    <div class="status">
+      <span id="status">Caricamento offerte…</span>
+      <button id="refresh" type="button">Aggiorna offerte</button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button id="tab-list" role="tab" aria-selected="true" type="button">Lista della spesa</button>
+    <button id="tab-browse" role="tab" aria-selected="false" type="button">Cerca tra tutte le offerte</button>
+  </div>
+
+  <div class="grid">
+    <main>
+      <section id="view-list">
+        <div class="panel editor">
+          <div class="editor-head">
+            <label for="list" class="label">La tua lista, un prodotto per riga</label>
+            <button id="example" class="link" type="button">Carica un esempio</button>
+          </div>
+          <textarea id="list" spellcheck="false" placeholder="mælk&#10;2x æg&#10;kaffe&#10;ost -flødeost&#10;hakket|fars okse"></textarea>
+          <p class="hint">
+            Scrivi in danese (<code>mælk</code>, <code>ost</code>, <code>kylling</code>) o in italiano: le parole comuni vengono tradotte (<code>latte</code> → <code>mælk</code>).
+            <code>2x kaffe</code> indica la quantità, <code>-parola</code> esclude, <code>a|b</code> accetta l'una o l'altra.
+            Tocca un'offerta per sceglierla al posto di quella più economica.
+          </p>
+        </div>
+        <div class="panel controls" style="margin-bottom:20px">
+          <div class="stores" id="store-toggles"></div>
+          <label class="check" for="sort">Ordina per
+            <select id="sort">
+              <option value="price">prezzo</option>
+              <option value="unit">prezzo al kg/l</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="desc"> cerca anche nella descrizione</label>
+          <label class="check"><input type="checkbox" id="future" checked> includi volantini in arrivo</label>
+        </div>
+        <div class="items" id="items"></div>
+      </section>
+
+      <section id="view-browse" hidden>
+        <div class="search-row">
+          <input id="q" type="search" placeholder="Cerca, es. kaffe, smør, bananer" autocomplete="off">
+        </div>
+        <div class="item"><ul class="offers" id="browse-results"></ul></div>
+      </section>
+    </main>
+
+    <aside class="summary" id="summary"></aside>
+  </div>
+
+  <footer>
+    Dati dall'API pubblica di eTilbudsavis (Tjek). I prezzi al kg/l sono stimati dalle quantità del volantino: controlla sempre le condizioni (limiti per cliente, app fedeltà come Lidl Plus o Coop).
+  </footer>
+</div>
+
+<script id="dizionario" type="application/json">
+{
+ "traduzioni": {
+  "latte": "mælk", "latte intero": "sødmælk", "latte parzialmente scremato": "letmælk", "panna": "fløde",
+  "uova": "æg", "uovo": "æg", "burro": "smør", "formaggio": "ost", "mozzarella": "mozzarella",
+  "parmigiano": "parmesan", "yogurt": "yoghurt", "pane": "brød", "pane di segale": "rugbrød",
+  "caffè": "kaffe", "caffe": "kaffe", "tè": "te", "zucchero": "sukker", "farina": "mel", "sale": "salt",
+  "olio": "olie", "olio d'oliva": "olivenolie", "aceto": "eddike", "riso": "ris", "pasta": "pasta",
+  "pomodori": "tomat", "pomodoro": "tomat", "passata": "hakkede tomater|passata", "patate": "kartofler",
+  "cipolle": "løg", "cipolla": "løg", "aglio": "hvidløg", "carote": "gulerødder", "insalata": "salat",
+  "cetrioli": "agurk", "cetriolo": "agurk", "peperoni": "peberfrugt", "zucchine": "squash", "funghi": "champignon|svampe",
+  "broccoli": "broccoli", "mele": "æbler", "mela": "æble", "banane": "bananer", "arance": "appelsiner",
+  "limoni": "citroner", "uva": "vindruer", "fragole": "jordbær", "pere": "pærer", "avocado": "avocado",
+  "pollo": "kylling", "petto di pollo": "kyllingebryst", "manzo": "okse", "maiale": "gris|svin",
+  "carne macinata": "hakket|fars", "macinato": "hakket|fars", "salsiccia": "pølse", "salsicce": "pølser",
+  "prosciutto": "skinke", "pancetta": "bacon", "salmone": "laks", "tonno": "tun", "pesce": "fisk",
+  "gamberi": "rejer", "birra": "øl", "vino": "vin", "vino rosso": "rødvin", "vino bianco": "hvidvin",
+  "acqua": "vand", "succo": "juice", "cioccolato": "chokolade", "biscotti": "kiks|småkager",
+  "cereali": "morgenmad|müsli|cornflakes", "detersivo": "vaskemiddel", "carta igienica": "toiletpapir",
+  "carta da cucina": "køkkenrulle", "pannolini": "bleer", "shampoo": "shampoo", "dentifricio": "tandpasta",
+  "surgelati": "frost", "gelato": "is|flødeis", "pizza": "pizza", "noci": "nødder", "miele": "honning",
+  "marmellata": "marmelade", "lievito": "gær", "legumi": "bønner|linser", "fagioli": "bønner", "ceci": "kikærter"
+ },
+ "falsi_amici": {
+  "æg": ["pålæg"], "ost": ["frost", "kost", "post", "rost", "leverpostej"], "vin": ["svin"],
+  "løg": ["hvidløg"], "mel": ["karamel", "kamel"], "ris": ["pris", "gris", "paris"], "is": ["ris", "pris", "gris"],
+  "te": ["kotelet"], "øl": ["bøl"], "mælk": ["kokosmælk", "havremælk", "mandelmælk", "sojamælk", "kakao", "chokolade", "kærnemælk"]
+ }
+}
+</script>
+<script>
+/* Offer data can be embedded by `python avis.py artifact`; otherwise it is fetched live. */
+window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
+(function () {
+  "use strict";
+  const API = "https://squid-api.tjek.com/v2/offers";
+  const STORES = [
+    { key: "lidl",  id: "71c90", name: "Lidl",      color: "#0050aa" },
+    { key: "fotex", id: "bdf5A", name: "Føtex",     color: "#00205b" },
+    { key: "bilka", id: "93f13", name: "Bilka",     color: "#0a9fd8" },
+    { key: "netto", id: "9ba51", name: "Netto",     color: "#f5b400" },
+    { key: "rema",  id: "11deC", name: "REMA 1000", color: "#e2001a" },
+  ];
+  const BY_ID = Object.fromEntries(STORES.map(s => [s.id, s]));
+  const BY_KEY = Object.fromEntries(STORES.map(s => [s.key, s]));
+  const CACHE_KEY = "avis-offers-v1", CACHE_HOURS = 6;
+  const SNAPSHOT = !!window.EMBEDDED_OFFERS;
+  const { traduzioni: DICT, falsi_amici: FALSE_FRIENDS } = JSON.parse(document.getElementById("dizionario").textContent);
+  const EXAMPLE = "mælk\n2x æg\nkaffe\nsmør\nost -flødeost\nkylling\nbananer\nrugbrød\nhakket|fars okse\nøl";
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable or full */ } },
+  };
+
+  const $ = id => document.getElementById(id);
+  const state = {
+    offers: [], fetchedAt: null,
+    list: store.get("avis-list", EXAMPLE),
+    chosen: store.get("avis-chosen", {}),
+    stores: store.get("avis-stores", STORES.map(s => s.key)),
+    sort: store.get("avis-sort", "price"),
+    desc: store.get("avis-desc", false),
+    future: store.get("avis-future", true),
+    expanded: {},
+  };
+
+  // ---------- data ----------
+  function trim(o) {
+    const q = o.quantity || {}, unit = q.unit || null, size = q.size || {}, pcs = q.pieces || {};
+    return {
+      id: o.id, s: (BY_ID[o.dealer_id] || {}).key, h: o.heading || "", d: o.description || "",
+      p: o.pricing ? o.pricing.price : null, pp: o.pricing ? o.pricing.pre_price : null,
+      u: unit && unit.si ? unit.si.symbol : null, f: unit && unit.si ? unit.si.factor : null,
+      sf: size.from || null, st: size.to || null, pc: pcs.from || 1,
+      from: o.run_from, till: o.run_till, img: o.images ? o.images.thumb : null,
+    };
+  }
+
+  async function fetchStore(s) {
+    const out = [];
+    for (let offset = 0; offset < 5000; offset += 100) {
+      const r = await fetch(`${API}?dealer_ids=${s.id}&limit=100&offset=${offset}`);
+      if (!r.ok) throw new Error(`${s.name}: HTTP ${r.status}`);
+      const page = await r.json();
+      out.push(...page.map(trim));
+      if (page.length < 100) break;
+    }
+    return out;
+  }
+
+  async function load(force) {
+    const btn = $("refresh");
+    if (SNAPSHOT && !force) {
+      state.offers = window.EMBEDDED_OFFERS.offers; state.fetchedAt = window.EMBEDDED_OFFERS.fetchedAt;
+      return done();
+    }
+    const cached = store.get(CACHE_KEY, null);
+    if (!force && cached && Date.now() - cached.fetchedAt < CACHE_HOURS * 3600e3) {
+      state.offers = cached.offers; state.fetchedAt = cached.fetchedAt;
+      return done();
+    }
+    btn.disabled = true; setStatus("Scarico le offerte dai volantini…");
+    try {
+      const all = await Promise.all(STORES.map(fetchStore));
+      state.offers = all.flat(); state.fetchedAt = Date.now();
+      store.set(CACHE_KEY, { offers: state.offers, fetchedAt: state.fetchedAt });
+    } catch (e) {
+      const fallback = SNAPSHOT ? window.EMBEDDED_OFFERS : cached;
+      if (fallback) { state.offers = fallback.offers; state.fetchedAt = fallback.fetchedAt; }
+      btn.disabled = false; done();
+      setStatus(SNAPSHOT
+        ? "Qui l'aggiornamento non è possibile: apri index.html dal repository per le offerte in tempo reale."
+        : `Aggiornamento non riuscito (${e.message}). Controlla la connessione e riprova.`, true);
+      return;
+    }
+    btn.disabled = false; done();
+  }
+
+  function done() {
+    const d = new Date(state.fetchedAt);
+    setStatus(`${state.offers.length} offerte · aggiornate ${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`);
+    render();
+  }
+  function setStatus(t, err) { const el = $("status"); el.textContent = t; el.className = err ? "error" : ""; }
+
+  // ---------- matching ----------
+  const norm = s => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+  function translate(phrase) {
+    const p = norm(phrase);
+    if (DICT[p]) return DICT[p];
+    return p.split(" ").map(w => (w.startsWith("-") || !DICT[w]) ? w : DICT[w].replace(/ /g, " ")).join(" ");
+  }
+
+  function parseLine(line) {
+    let text = line.trim(), qty = 1, m;
+    if ((m = text.match(/^(\d+)\s*[x×*]?\s+(.+)$/i))) { qty = +m[1]; text = m[2]; }
+    else if ((m = text.match(/^(.+?)\s+[x×*]\s*(\d+)$/i))) { qty = +m[2]; text = m[1]; }
+    const tr = translate(text);
+    const tokens = tr.split(" ").filter(Boolean);
+    const pos = [], neg = [];
+    for (const t of tokens) {
+      const w = t.replace(/ /g, " ");
+      if (w.startsWith("-") && w.length > 1) neg.push(w.slice(1));
+      else pos.push(w.split("|").filter(Boolean));
+    }
+    // Phrases from the dictionary (e.g. "hakkede tomater") stay together as one substring.
+    return { raw: line.trim(), text, qty, translated: norm(tr.replace(/ /g, " ")) !== norm(text) ? tr.replace(/ /g, " ") : null, pos, neg, key: norm(line) };
+  }
+
+  // Danish compounds put the product at the end ("hytteost" is cheese, "ostehaps" is a snack),
+  // so a term matching a whole word or the end of a compound ranks above one that only starts it.
+  // Returns 0 (no match), 1 (the product), 2 (related: prefix match), 3 (only in the description).
+  const SUFFIX = "(?:e|er|en|et|ne|erne|s)?";
+  const reCache = {};
+  function termTier(term, words, text) {
+    if (term.includes(" ")) return text.includes(term) ? 1 : 0;
+    const ff = FALSE_FRIENDS[term] || [];
+    const re = reCache[term] || (reCache[term] = {
+      whole: new RegExp("^" + term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + SUFFIX + "$"),
+      head: new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"),
+    });
+    let best = 0;
+    for (const w of words) {
+      if (ff.some(f => w.startsWith(f) || w.endsWith(f))) continue;
+      if (re.whole.test(w) || (term.length >= 3 && re.head.test(w))) return 1;
+      if (w.startsWith(term)) best = 2;
+    }
+    return best;
+  }
+  const wordsOf = t => t.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  function tierIn(text, q) {
+    const lower = text.toLowerCase(), words = wordsOf(text);
+    if (q.neg.some(n => lower.includes(n))) return -1;
+    let worst = 1;
+    for (const alts of q.pos) {
+      let t = 0;
+      for (const a of alts) { const x = termTier(a, words, lower); if (x && (!t || x < t)) t = x; }
+      if (!t) return 0;
+      worst = Math.max(worst, t);
+    }
+    return worst;
+  }
+  function matchTier(o, q) {
+    if (!q.pos.length) return 0;
+    const h = tierIn(o.h, q);
+    if (h !== 0 || !state.desc) return Math.max(h, 0);
+    const d = tierIn(o.d, q);
+    return d > 0 ? 3 : 0;
+  }
+
+  function unitPrice(o) {
+    if (o.p == null || !o.u || !o.f || !o.sf) return null;
+    const hi = (o.st || o.sf) * o.f * (o.pc || 1), lo = o.sf * o.f * (o.pc || 1);
+    if (!(hi > 0)) return null;
+    return { best: o.p / hi, worst: o.p / lo, unit: o.u === "pcs" ? "stk" : o.u };
+  }
+
+  function visibleOffers() {
+    const now = Date.now(), on = new Set(state.stores);
+    return state.offers.filter(o => o.s && on.has(o.s) && o.p != null &&
+      Date.parse(o.till) >= now && (state.future || Date.parse(o.from) <= now));
+  }
+
+  // Takes a list of offers and a query; returns matching offers, best tier first, then cheapest.
+  function findOffers(pool, q) {
+    const key = state.sort === "unit"
+      ? o => { const u = unitPrice(o); return u ? u.best : Infinity; }
+      : o => o.p;
+    const out = [];
+    for (const o of pool) { const t = matchTier(o, q); if (t > 0) out.push({ o, t }); }
+    out.sort((a, b) => a.t - b.t || key(a.o) - key(b.o) || a.o.p - b.o.p);
+    return out.map(x => Object.assign(Object.create(x.o), { _tier: x.t }));
+  }
+
+  // ---------- formatting ----------
+  const kr = n => n.toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dShort = s => new Date(s).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const chip = key => { const s = BY_KEY[key]; return `<span class="chip"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</span>`; };
+
+  function offerRow(o, chosen, itemKey) {
+    const u = unitPrice(o), now = Date.now(), upcoming = Date.parse(o.from) > now;
+    const img = (!SNAPSHOT && o.img)
+      ? `<img class="thumb" src="${esc(o.img)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb none',textContent:'—'}))">`
+      : `<div class="thumb none">${esc(BY_KEY[o.s].name.slice(0, 2))}</div>`;
+    const unit = u ? `${u.best !== u.worst ? "da " : ""}${kr(u.best)} kr/${u.unit}` : "";
+    const firstDesc = o.d.split("\n")[0];
+    return `<li class="offer${chosen ? " chosen" : ""}" ${itemKey != null ? `data-item="${esc(itemKey)}" data-offer="${esc(o.id)}" tabindex="0" role="button" aria-pressed="${chosen}"` : ""}>
+      ${img}
+      <div class="o-main">
+        <div class="o-title">${esc(o.h)}</div>
+        ${firstDesc ? `<div class="o-desc" title="${esc(o.d)}">${esc(firstDesc)}</div>` : ""}
+        <div class="o-meta">${chip(o.s)}
+          ${upcoming ? `<span class="tag">dal ${dShort(o.from)}</span>` : `<span>fino al ${dShort(o.till)}</span>`}
+          ${o._tier === 2 ? `<span class="tag">correlato</span>` : o._tier === 3 ? `<span class="tag">nella descrizione</span>` : ""}
+          ${chosen ? `<span class="tag ok">scelta</span>` : ""}</div>
+      </div>
+      <div class="o-price"><div class="p">${kr(o.p)}</div>
+        ${o.pp ? `<div class="pre">${kr(o.pp)}</div>` : ""}
+        ${unit ? `<div class="u">${unit}</div>` : ""}</div>
+    </li>`;
+  }
+
+  // ---------- render ----------
+  function computeItems() {
+    const pool = visibleOffers();
+    const lines = state.list.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+    const seen = new Set();
+    return lines.map(parseLine).filter(q => !seen.has(q.key) && seen.add(q.key)).map(q => {
+      const found = findOffers(pool, q);
+      const pick = found.find(o => o.id === state.chosen[q.key]) || (found[0] && found[0]._tier === 1 ? found[0] : null);
+      return { q, found, pick };
+    });
+  }
+
+  function renderList(items) {
+    const box = $("items");
+    if (!state.offers.length) { box.innerHTML = `<div class="panel empty">Le offerte non sono ancora caricate.</div>`; return; }
+    if (!items.length) { box.innerHTML = `<div class="panel empty">Scrivi qualche prodotto nella lista qui sopra.</div>`; return; }
+    box.innerHTML = items.map(({ q, found, pick }) => {
+      const head = `<div class="item-head">
+          <div><span class="q">${q.qty > 1 ? q.qty + "× " : ""}${esc(q.text)}</span>
+          ${q.translated ? `<span class="tr"> → ${esc(q.translated)}</span>` : ""}</div>
+          ${pick ? `<span class="best">${found.length} offert${found.length === 1 ? "a" : "e"}</span>`
+            : found.length ? `<span class="missing-note">solo prodotti simili: tocca per sceglierne uno</span>`
+            : `<span class="missing-note">nessuna offerta questa settimana</span>`}
+        </div>`;
+      if (!found.length) return `<div class="item missing">${head}</div>`;
+      const limit = state.expanded[q.key] ? found.length : 4;
+      const shown = found.slice(0, limit);
+      if (pick && !shown.includes(pick)) shown.push(pick);
+      return `<div class="item">${head}<ul class="offers">${shown.map(o => offerRow(o, o === pick, q.key)).join("")}</ul>
+        ${found.length > limit ? `<div class="more"><button class="link" data-expand="${esc(q.key)}" type="button">Mostra altre ${found.length - limit} offerte</button></div>` : ""}</div>`;
+    }).join("");
+  }
+
+  function renderSummary(items) {
+    const withPick = items.filter(i => i.pick);
+    const missing = items.filter(i => !i.pick);
+    const byStore = {};
+    for (const i of withPick) (byStore[i.pick.s] = byStore[i.pick.s] || []).push(i);
+    const total = withPick.reduce((t, i) => t + i.pick.p * i.q.qty, 0);
+
+    const storeBlocks = STORES.filter(s => byStore[s.key]).map(s => {
+      const rows = byStore[s.key];
+      const sub = rows.reduce((t, i) => t + i.pick.p * i.q.qty, 0);
+      return `<div class="r-store">${chip(s.key)}<span class="r-muted" style="margin-left:auto;font-family:var(--font-mono);font-weight:400">${kr(sub)}</span></div>` +
+        rows.map(i => `<div class="r-row"><span class="l">${i.q.qty > 1 ? i.q.qty + "× " : ""}${esc(i.pick.h)}</span><span>${kr(i.pick.p * i.q.qty)}</span></div>`).join("");
+    }).join("");
+
+    // One-store comparison: cheapest match for each item within each store.
+    const single = STORES.filter(s => state.stores.includes(s.key)).map(s => {
+      let n = 0, sum = 0;
+      for (const i of items) {
+        const best = i.found.find(o => o.s === s.key && (o._tier === 1 || o === i.pick));
+        if (best) { n++; sum += best.p * i.q.qty; }
+      }
+      return { s, n, sum };
+    }).sort((a, b) => b.n - a.n || a.sum - b.sum);
+
+    $("summary").innerHTML = `
+      <div class="receipt">
+        <h2>Dove comprare</h2>
+        <div class="r-muted">${withPick.length} di ${items.length} prodotti in offerta</div>
+        <div class="rule"></div>
+        ${storeBlocks || `<div class="r-muted">Ancora nessuna offerta trovata.</div>`}
+        <div class="rule"></div>
+        <div class="r-row r-total"><span>Totale</span><span>${kr(total)} kr</span></div>
+        <div class="r-muted">${Object.keys(byStore).length} negozi${missing.length ? ` · senza offerta: ${missing.map(i => esc(i.q.text)).join(", ")}` : ""}</div>
+      </div>
+      <div class="panel">
+        <h2 style="margin-bottom:8px">Tutto in un negozio</h2>
+        <table class="stores-tbl">
+          <thead><tr><th>Negozio</th><th style="text-align:right">Prodotti</th><th style="text-align:right">Totale</th></tr></thead>
+          <tbody>${single.map((r, idx) => `<tr class="${idx === 0 && r.n ? "top" : ""}"><td>${chip(r.s.key)}</td><td class="n">${r.n}/${items.length}</td><td class="n">${r.n ? kr(r.sum) : "—"}</td></tr>`).join("")}</tbody>
+        </table>
+        <p class="hint" style="margin-top:8px">Il totale conta solo i prodotti trovati in quel negozio.</p>
+      </div>`;
+  }
+
+  function renderBrowse() {
+    const box = $("browse-results");
+    const raw = $("q").value.trim();
+    if (!raw) { box.innerHTML = `<li class="empty">Scrivi una parola per cercare tra ${visibleOffers().length} offerte.</li>`; return; }
+    const q = parseLine(raw);
+    const found = findOffers(visibleOffers(), q);
+    box.innerHTML = found.length
+      ? found.slice(0, 200).map(o => offerRow(o, false, null)).join("")
+      : `<li class="empty">Nessuna offerta per “${esc(raw)}”.</li>`;
+  }
+
+  function renderToggles() {
+    $("store-toggles").innerHTML = STORES.map(s =>
+      `<button type="button" class="store-toggle" data-store="${s.key}" aria-pressed="${state.stores.includes(s.key)}"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</button>`).join("");
+  }
+
+  function render() {
+    renderToggles();
+    const items = computeItems();
+    renderList(items); renderSummary(items); renderBrowse();
+  }
+
+  // ---------- events ----------
+  $("list").value = state.list;
+  $("sort").value = state.sort; $("desc").checked = state.desc; $("future").checked = state.future;
+  let t;
+  $("list").addEventListener("input", e => {
+    state.list = e.target.value; store.set("avis-list", state.list);
+    clearTimeout(t); t = setTimeout(render, 250);
+  });
+  $("example").addEventListener("click", () => { $("list").value = state.list = EXAMPLE; store.set("avis-list", EXAMPLE); render(); });
+  $("sort").addEventListener("change", e => { state.sort = e.target.value; store.set("avis-sort", state.sort); render(); });
+  $("desc").addEventListener("change", e => { state.desc = e.target.checked; store.set("avis-desc", state.desc); render(); });
+  $("future").addEventListener("change", e => { state.future = e.target.checked; store.set("avis-future", state.future); render(); });
+  $("refresh").addEventListener("click", () => load(true));
+  $("q").addEventListener("input", renderBrowse);
+  $("store-toggles").addEventListener("click", e => {
+    const b = e.target.closest("[data-store]"); if (!b) return;
+    const k = b.dataset.store;
+    state.stores = state.stores.includes(k) ? state.stores.filter(x => x !== k) : [...state.stores, k];
+    store.set("avis-stores", state.stores); render();
+  });
+  function choose(el) {
+    const k = el.dataset.item, id = el.dataset.offer;
+    state.chosen[k] = id; store.set("avis-chosen", state.chosen); render();
+  }
+  $("items").addEventListener("click", e => {
+    const ex = e.target.closest("[data-expand]");
+    if (ex) { state.expanded[ex.dataset.expand] = true; return render(); }
+    const el = e.target.closest(".offer[data-item]"); if (el) choose(el);
+  });
+  $("items").addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const el = e.target.closest(".offer[data-item]"); if (el) { e.preventDefault(); choose(el); }
+  });
+  function tab(which) {
+    const list = which === "list";
+    $("tab-list").setAttribute("aria-selected", list); $("tab-browse").setAttribute("aria-selected", !list);
+    $("view-list").hidden = !list; $("view-browse").hidden = list;
+    if (!list) $("q").focus();
+  }
+  $("tab-list").addEventListener("click", () => tab("list"));
+  $("tab-browse").addEventListener("click", () => tab("browse"));
+  if (SNAPSHOT) $("refresh").title = "In questa copia le offerte sono salvate al momento della pubblicazione";
+
+  load(false);
+})();
+</script>
+<!--APP-END-->
+</body>
+</html>
