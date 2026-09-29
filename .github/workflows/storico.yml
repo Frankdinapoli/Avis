@@ -1,0 +1,23 @@
+name: storico
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: storico
+jobs:
+  storico:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 avis.py storico
+      - name: Commit history
+        run: |
+          git add data/history.json
+          if git diff --cached --quiet; then echo "nessun cambiamento"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Aggiorna storico prezzi"
+          git push
