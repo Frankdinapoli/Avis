@@ -6,7 +6,7 @@ I dati vengono dall'API pubblica di eTilbudsavis/Tjek (`squid-api.tjek.com`), la
 
 ## Installazione su iPhone e Mac (una volta sola)
 
-1. Su GitHub: **Settings → Pages → Build and deployment → Deploy from a branch**, scegli `claude/eloquent-franklin-9e2ymb` e `/ (root)`, poi *Save*. Dopo un minuto l'app è su **https://frankdinapoli.github.io/avis/**.
+1. Su GitHub: **Settings → Pages → Build and deployment → Deploy from a branch**, scegli `claude/eloquent-franklin-9e2ymb` e `/ (root)`, poi *Save*. Dopo un minuto l'app è su **https://frankdinapoli.github.io/Avis/**.
 2. **iPhone**: apri il link in Safari → Condividi → *Aggiungi alla schermata Home*.
 3. **Mac**: apri il link in Safari → File → *Aggiungi al Dock*.
 
