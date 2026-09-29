@@ -171,8 +171,12 @@ table.stores-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .stores-tbl td.n { text-align: right; font-family: var(--font-mono); }
 .stores-tbl tr.top td { font-weight: 600; color: var(--good); }
 
-.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; margin-bottom: 16px; background: var(--line); border-radius: 12px; max-width: 520px; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; padding: 3px; margin-bottom: 16px; background: var(--line); border-radius: 12px; max-width: 520px; }
 .tabs button { border: 0; border-radius: 9px; background: none; min-height: 40px; padding: 0 10px; color: var(--muted); font-weight: 600; }
+.hist { margin: 0 0 8px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.hist b { color: var(--ink); }
+.tag.low { background: var(--good); color: #fff; }
+.hist .tag { white-space: normal; }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .search-row input { flex: 1; min-width: 0; font: 16px var(--font-body); min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
@@ -213,6 +217,7 @@ footer { margin-top: 28px; font-size: 12px; color: var(--muted); }
   <div class="tabs" role="tablist">
     <button id="tab-list" role="tab" aria-selected="true" type="button">La mia lista</button>
     <button id="tab-browse" role="tab" aria-selected="false" type="button">Tutte le offerte</button>
+    <button id="tab-deals" role="tab" aria-selected="false" type="button">Occasioni</button>
   </div>
 
   <div class="grid">
@@ -258,6 +263,11 @@ footer { margin-top: 28px; font-size: 12px; color: var(--muted); }
           <input id="q" type="search" placeholder="Cerca, es. kaffe, smør, bananer" autocomplete="off" enterkeyhint="search">
         </div>
         <div class="item"><ul class="offers" id="browse-results"></ul></div>
+      </section>
+
+      <section id="view-deals" hidden>
+        <p class="hint" id="deals-note"></p>
+        <div class="item"><ul class="offers" id="deals-results"></ul></div>
       </section>
     </main>
 
@@ -306,7 +316,123 @@ document.addEventListener("DOMContentLoaded", function () {
   "cereali": "morgenmad|müsli|cornflakes", "detersivo": "vaskemiddel", "carta igienica": "toiletpapir",
   "carta da cucina": "køkkenrulle", "pannolini": "bleer", "shampoo": "shampoo", "dentifricio": "tandpasta",
   "surgelati": "frost", "gelato": "is|flødeis", "pizza": "pizza", "noci": "nødder", "miele": "honning",
-  "marmellata": "marmelade", "lievito": "gær", "legumi": "bønner|linser", "fagioli": "bønner", "ceci": "kikærter"
+  "marmellata": "marmelade", "lievito": "gær", "legumi": "bønner|linser", "fagioli": "bønner", "ceci": "kikærter",
+  "coca": "coca-cola",
+  "coca cola": "coca-cola",
+  "cocacola": "coca-cola",
+  "coke": "coca-cola",
+  "cola": "cola",
+  "sprite": "sprite",
+  "fanta": "fanta",
+  "pepsi": "pepsi",
+  "nutella": "nutella",
+  "barilla": "barilla",
+  "philadelphia": "philadelphia",
+  "carta forno": "bagepapir",
+  "carta da forno": "bagepapir",
+  "pellicola": "husholdningsfilm|film",
+  "pellicola trasparente": "husholdningsfilm",
+  "alluminio": "alufolie",
+  "carta stagnola": "alufolie",
+  "spugne": "svampe|skuresvamp",
+  "spugna": "skuresvamp|svamp",
+  "sapone": "sæbe",
+  "bagnoschiuma": "shower|bodywash|badeskum",
+  "doccia schiuma": "shower|bodywash",
+  "deodorante": "deodorant",
+  "assorbenti": "bind|menstruationsbind",
+  "cracker": "kiks|crackers",
+  "crackers": "kiks|crackers",
+  "patatine": "chips",
+  "bibite": "sodavand",
+  "bibita": "sodavand",
+  "gassosa": "sodavand",
+  "aranciata": "appelsinsodavand|sodavand",
+  "succo d'arancia": "appelsinjuice",
+  "succo di arancia": "appelsinjuice",
+  "succo di mela": "æblejuice",
+  "spremuta": "juice",
+  "kafe": "kaffe",
+  "tonno in scatola": "tun",
+  "latte di soia": "sojadrik|sojamælk",
+  "latte di avena": "havredrik|havremælk",
+  "latte di mandorla": "mandeldrik",
+  "panna da cucina": "madlavningsfløde",
+  "panna montata": "piskefløde",
+  "ketchup": "ketchup",
+  "maionese": "mayonnaise",
+  "senape": "sennep",
+  "pesto": "pesto",
+  "tagliatelle": "pasta",
+  "spaghetti": "spaghetti",
+  "penne": "penne|pasta",
+  "sugo": "pastasauce|tomatsauce",
+  "olive": "oliven",
+  "mais": "majs",
+  "piselli": "ærter",
+  "spinaci": "spinat",
+  "zucca": "græskar",
+  "melanzane": "aubergine",
+  "cavolo": "kål",
+  "cavolfiore": "blomkål",
+  "lattuga": "salat",
+  "basilico": "basilikum",
+  "prezzemolo": "persille",
+  "rosmarino": "rosmarin",
+  "pepe": "peber",
+  "spezie": "krydderi",
+  "farina 00": "hvedemel",
+  "pancarrè": "toastbrød",
+  "toast": "toastbrød",
+  "fette biscottate": "knækbrød",
+  "grissini": "grissini|brødstænger",
+  "cornflakes": "cornflakes",
+  "salame": "salami",
+  "mortadella": "pålæg",
+  "wurstel": "pølser",
+  "hamburger": "burger|bøf",
+  "bistecca": "bøf|steak",
+  "tacchino": "kalkun",
+  "agnello": "lam",
+  "merluzzo": "torsk",
+  "acciughe": "ansjoser",
+  "vodka": "vodka",
+  "prosecco": "prosecco|mousserende",
+  "spumante": "mousserende",
+  "acqua frizzante": "danskvand|kildevand",
+  "acqua minerale": "kildevand|mineralvand",
+  "tovaglioli": "servietter",
+  "sacchetti": "poser",
+  "sacchetti spazzatura": "affaldsposer",
+  "candeggina": "klor",
+  "ammorbidente": "skyllemiddel",
+  "lavastoviglie": "opvask|maskinopvask",
+  "piatti": "opvask",
+  "sgrassatore": "rengøring",
+  "detergente": "rengøring",
+  "batterie": "batterier",
+  "lampadine": "pærer|led",
+  "carta": "papir",
+  "penne bic": "kuglepen",
+  "gomma da masticare": "tyggegummi",
+  "caramelle": "bolsjer|slik",
+  "gelatina": "gelé",
+  "panettone": "kage",
+  "torta": "kage",
+  "budino": "budding",
+  "tè freddo": "iste",
+  "ice tea": "iste",
+  "caffè macinato": "formalet kaffe",
+  "caffè in grani": "kaffebønner",
+  "capsule": "kapsler",
+  "rasoi": "barberblade|barbermaskine",
+  "cotton fioc": "vatpinde",
+  "cotone": "vat",
+  "crema": "creme",
+  "crema solare": "solcreme",
+  "balsamo": "balsam",
+  "sapone liquido": "håndsæbe",
+  "gel doccia": "shower|bodywash"
  },
  "falsi_amici": {
   "æg": ["pålæg"], "ost": ["frost", "kost", "post", "rost", "leverpostej"], "vin": ["svin"],
@@ -318,6 +444,7 @@ document.addEventListener("DOMContentLoaded", function () {
 <script>
 /* Offer data can be embedded by `python avis.py artifact`; otherwise it is fetched live. */
 window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
+window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY__*/
 (function () {
   "use strict";
   const API = "https://squid-api.tjek.com/v2/offers";
@@ -485,55 +612,89 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
 
   // ---------- matching ----------
   const norm = s => s.toLowerCase().replace(/\s+/g, " ").trim();
-
-  function translate(phrase) {
-    const p = norm(phrase);
-    if (DICT[p]) return DICT[p];
-    return p.split(" ").map(w => (w.startsWith("-") || !DICT[w]) ? w : DICT[w].replace(/ /g, " ")).join(" ");
-  }
+  // Comparison form: case, accents and Danish spelling variants folded (ø/oe→o, æ/ae→e, å/aa→a).
+  const fold = s => s.toLowerCase().replace(/æ/g, "e").replace(/ø/g, "o").normalize("NFD").replace(/\p{M}/gu, "")
+    .replace(/ae/g, "e").replace(/oe/g, "o").replace(/aa/g, "a");
+  const FF = {};
+  for (const k in FALSE_FRIENDS) FF[fold(k)] = FALSE_FRIENDS[k].map(fold);
+  // "coca-cola" -> "coca cola": alternatives with spaces are phrases.
+  const cleanAlt = a => fold(a).replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const altsOf = v => v.split("|").map(cleanAlt).filter(Boolean);
 
   function parseLine(line) {
     let text = line.trim(), qty = 1, m;
     if ((m = text.match(/^(\d+)\s*[x×*]?\s+(.+)$/i))) { qty = +m[1]; text = m[2]; }
     else if ((m = text.match(/^(.+?)\s+[x×*]\s*(\d+)$/i))) { qty = +m[2]; text = m[1]; }
-    const tr = translate(text);
-    const tokens = tr.split(" ").filter(Boolean);
-    const pos = [], neg = [];
-    for (const t of tokens) {
-      const w = t.replace(/ /g, " ");
-      if (w.startsWith("-") && w.length > 1) neg.push(w.slice(1));
-      else pos.push(w.split("|").filter(Boolean));
+    const phrase = norm(text), pos = [], neg = [];
+    const hits = [];  // dictionary values actually used, shown to the user as "→ mælk"
+    const lookup = k => DICT[k] || DICT[k.normalize("NFC")];
+    const dict = k => { const v = lookup(k); if (v && !hits.includes(v)) hits.push(v); return v; };
+    if (dict(phrase)) pos.push(altsOf(dict(phrase)));
+    else for (const tok of phrase.split(" ")) {
+      if (tok.startsWith("-")) { for (const n of fold(tok).split(/[^\p{L}\p{N}]+/u).filter(Boolean)) neg.push(n); continue; }
+      const whole = dict(tok);
+      if (whole) { pos.push(altsOf(whole)); continue; }
+      for (const sw of tok.split(/[^\p{L}\p{N}|]+/u).filter(Boolean)) {
+        const alts = sw.split("|").filter(Boolean);
+        if (!alts.length) continue;
+        pos.push(alts.length === 1 && dict(alts[0]) ? altsOf(dict(alts[0])) : alts.map(a => dict(a) ? altsOf(dict(a)) : [cleanAlt(a)]).flat().filter(Boolean));
+      }
     }
-    // Phrases from the dictionary (e.g. "hakkede tomater") stay together as one substring.
-    return { raw: line.trim(), text, qty, translated: norm(tr.replace(/ /g, " ")) !== norm(text) ? tr.replace(/ /g, " ") : null, pos, neg, key: norm(line) };
+    const said = cleanAlt(text);
+    const shown = hits.filter(v => !altsOf(v).every(a => said.includes(a)));
+    return { raw: line.trim(), text, qty, translated: shown.length ? shown.join(" ") : null, pos, neg, key: norm(line) };
   }
 
   // Danish compounds put the product at the end ("hytteost" is cheese, "ostehaps" is a snack),
   // so a term matching a whole word or the end of a compound ranks above one that only starts it.
-  // Returns 0 (no match), 1 (the product), 2 (related: prefix match), 3 (only in the description).
+  // termTier returns 0 (no match), 1 (the product), 1.5 (product with a 1-letter typo), 2 (related: prefix match).
+  // tierIn/matchScore keep the fractional value for sorting; matchTier floors it (1, 2, or 3 = only in the description).
   const SUFFIX = "(?:e|er|en|et|ne|erne|s)?";
   const reCache = {};
+  function within1(a, b) {
+    if (a === b) return true;
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > 1) return false;
+    if (la === lb) {
+      let i = 0; while (i < la && a[i] === b[i]) i++;
+      return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+    }
+    const [s, l] = la < lb ? [a, b] : [b, a];
+    let i = 0; while (i < s.length && s[i] === l[i]) i++;
+    return s.slice(i) === l.slice(i + 1);
+  }
   function termTier(term, words, text) {
-    if (term.includes(" ")) return text.includes(term) ? 1 : 0;
-    const ff = FALSE_FRIENDS[term] || [];
+    if (term.includes(" ")) {
+      if (text.includes(term)) return 1;
+      const j = term.replace(/ /g, "");
+      return j.length >= 3 ? termTier(j, words, text) : 0;
+    }
+    const ff = FF[term] || [];
     const re = reCache[term] || (reCache[term] = {
       whole: new RegExp("^" + term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + SUFFIX + "$"),
       head: new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"),
     });
     let best = 0;
     for (const w of words) {
+      if (w[0] === "\x01") { if (w.length - 1 === term.length && w.endsWith(term)) return 1; continue; } // joined pair: exact only
       if (ff.some(f => w.startsWith(f) || w.endsWith(f))) continue;
       if (re.whole.test(w) || (term.length >= 3 && re.head.test(w))) return 1;
-      if (w.startsWith(term)) best = 2;
+      if (term.length >= 3 && w.startsWith(term)) best = 2;
+      else if (term.length >= 5 && best !== 1.5) {
+        const n = term.length;
+        if ([n - 1, n, n + 1].some(k => w.length >= k && within1(term, w.slice(w.length - k)))) best = 1.5;
+      }
     }
     return best;
   }
-  const wordsOf = t => t.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-  function tierIn(text, q) {
-    const lower = text.toLowerCase(), words = wordsOf(text);
-    if (q.neg.some(n => lower.includes(n))) return -1;
+  const wordsOf = t => {
+    const ws = fold(t).split(/[^\p{L}\p{N}]+/u).filter(Boolean), out = ws.slice();
+    for (let i = 0; i + 1 < ws.length; i++) out.push("\x01" + ws[i] + ws[i + 1]); // "rug brød" ~ "rugbrød"
+    return out;
+  };
+  function scorePos(pos, words, lower) {
     let worst = 1;
-    for (const alts of q.pos) {
+    for (const alts of pos) {
       let t = 0;
       for (const a of alts) { const x = termTier(a, words, lower); if (x && (!t || x < t)) t = x; }
       if (!t) return 0;
@@ -541,13 +702,27 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
     }
     return worst;
   }
-  function matchTier(o, q) {
+  function tierIn(text, q) {
+    const words = wordsOf(text), lower = words.length ? fold(text).replace(/[^\p{L}\p{N}]+/gu, " ") : "";
+    if (q.neg.some(n => lower.includes(n))) return -1;
+    let r = scorePos(q.pos, words, lower);
+    // "coca cola" ↔ "cocacola": also try joining adjacent query words
+    for (let i = 0; !r && i + 1 < q.pos.length; i++) {
+      const joined = [];
+      for (const a of q.pos[i]) for (const b of q.pos[i + 1]) joined.push(a.replace(/ /g, "") + b.replace(/ /g, ""));
+      const s = scorePos([...q.pos.slice(0, i), joined, ...q.pos.slice(i + 2)], words, lower);
+      if (s && (!r || s < r)) r = s;
+    }
+    return r;
+  }
+  function matchScore(o, q) {
     if (!q.pos.length) return 0;
     const h = tierIn(o.h, q);
     if (h !== 0 || !state.desc) return Math.max(h, 0);
     const d = tierIn(o.d, q);
     return d > 0 ? 3 : 0;
   }
+  const matchTier = (o, q) => Math.floor(matchScore(o, q));
 
   function unitPrice(o) {
     if (o.p == null || !o.u || !o.f || !o.sf) return null;
@@ -568,9 +743,69 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
       ? o => { const u = unitPrice(o); return u ? u.best : Infinity; }
       : o => o.p;
     const out = [];
-    for (const o of pool) { const t = matchTier(o, q); if (t > 0) out.push({ o, t }); }
+    for (const o of pool) { const t = matchScore(o, q); if (t > 0) out.push({ o, t }); }
     out.sort((a, b) => a.t - b.t || key(a.o) - key(b.o) || a.o.p - b.o.p);
-    return out.map(x => Object.assign(Object.create(x.o), { _tier: x.t }));
+    return out.map(x => Object.assign(Object.create(x.o), { _tier: Math.floor(x.t) }));
+  }
+
+  // ---------- price history ----------
+  let HIST = window.EMBEDDED_HISTORY || null, histMemo = null;
+  const MIN_OBS = 3;
+  const normH = h => String(h).toLowerCase().replace(/[^a-zæøå0-9]+/g, " ").trim();
+  const metricOf = o => { const u = unitPrice(o); return u ? { v: u.best, un: u.unit } : { v: o.p, un: "" }; };
+  const fmtV = (v, un) => `${kr(v)} kr${un ? "/" + un : ""}`;
+  const median = a => { const b = [...a].sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+  // Merges history with the current offers: one record per offer id.
+  function histData() {
+    if (histMemo && histMemo.h === HIST && histMemo.o === state.offers) return histMemo;
+    const recs = new Map();
+    for (const [id, r] of Object.entries(HIST || {})) {
+      if (r.p == null) continue;
+      recs.set(id, { id, s: r.s, h: r.h, d: "", p: r.p, from: r.from, till: r.till, v: r.up != null ? r.up : r.p, un: r.un || "" });
+    }
+    for (const o of state.offers) {
+      if (!o.s || o.p == null || !o.from) continue;
+      const m = metricOf(o);
+      recs.set(o.id, { id: o.id, s: o.s, h: o.h, d: "", p: o.p, from: o.from.slice(0, 10), till: (o.till || "").slice(0, 10), v: m.v, un: m.un });
+    }
+    const pool = [...recs.values()], groups = new Map();
+    for (const r of pool) {
+      const k = r.s + "|" + normH(r.h) + "|" + r.un;
+      let g = groups.get(k); if (!g) groups.set(k, g = new Map());
+      const fk = r.from; if (!g.has(fk) || g.get(fk).v > r.v) g.set(fk, r);
+    }
+    return histMemo = { h: HIST, o: state.offers, pool, groups };
+  }
+  // Stats over observations (distinct flyer = store + start date); null when there are too few.
+  function statsOf(obs) {
+    const list = [...obs];
+    if (list.length < MIN_OBS) return null;
+    const min = list.reduce((a, b) => (b.v < a.v ? b : a));
+    return { n: list.length, min, med: median(list.map(r => r.v)) };
+  }
+  function offerStats(o) {
+    const m = metricOf(o), g = histData().groups.get(o.s + "|" + normH(o.h) + "|" + m.un);
+    const st = g && statsOf(g.values());
+    return st && Object.assign({ v: m.v, un: m.un }, st);
+  }
+  const isLow = o => { const st = offerStats(o); return !!st && st.v <= st.min.v + 0.005; };
+  function itemHistory(pick, found) {
+    if (!pick || !HIST) return null;
+    const q = found.q, m = metricOf(pick), obs = new Map();
+    for (const r of findOffers(histData().pool, q)) {
+      if (r._tier !== 1 || r.un !== m.un) continue;
+      const k = r.s + "|" + r.from; if (!obs.has(k) || obs.get(k).v > r.v) obs.set(k, r);
+    }
+    const st = statsOf(obs.values());
+    return st && Object.assign({ v: m.v, un: m.un }, st);
+  }
+  function histLine(st) {
+    if (!st) return `<div class="hist">Storico prezzi: dati ancora insufficienti (servono almeno ${MIN_OBS} volantini diversi).</div>`;
+    const low = st.v <= st.min.v + 0.005;
+    const verdict = low ? `<span class="tag low">Minimo storico</span>`
+      : st.v <= st.med ? `<span class="tag ok">Buon prezzo</span>`
+      : `<span class="tag">Sopra la media: di solito scende a ${fmtV(st.min.v, st.un)}, meglio aspettare</span>`;
+    return `<div class="hist">${verdict}<span>Minimo: <b>${fmtV(st.min.v, st.un)}</b> (${esc(BY_KEY[st.min.s].name)}, ${dShort(st.min.from)})</span><span>Tipico: <b>${fmtV(st.med, st.un)}</b></span><span>${st.n} volantini</span></div>`;
   }
 
   // ---------- formatting ----------
@@ -594,6 +829,7 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
         <div class="o-meta">${chip(o.s)}
           ${upcoming ? `<span class="tag">dal ${dShort(o.from)}</span>` : `<span>fino al ${dShort(o.till)}</span>`}
           ${o._tier === 2 ? `<span class="tag">correlato</span>` : o._tier === 3 ? `<span class="tag">nella descrizione</span>` : ""}
+          ${isLow(o) ? `<span class="tag low">minimo storico</span>` : ""}
           ${o.pp && o.pp > o.p ? `<span class="tag save">−${kr(o.pp - o.p)} kr</span>` : ""}
           ${chosen ? `<span class="tag ok">scelta</span>` : ""}</div>
       </div>
@@ -611,6 +847,7 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
     return lines.map(parseLine).filter(q => !seen.has(q.key) && seen.add(q.key)).map(q => {
       const found = findOffers(pool, q);
       const pick = found.find(o => o.id === state.chosen[q.key]) || (found[0] && found[0]._tier === 1 ? found[0] : null);
+      found.q = q;
       return { q, found, pick };
     });
   }
@@ -631,7 +868,7 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
       const limit = state.expanded[q.key] ? found.length : 4;
       const shown = found.slice(0, limit);
       if (pick && !shown.includes(pick)) shown.push(pick);
-      return `<div class="item">${head}<ul class="offers">${shown.map(o => offerRow(o, o === pick, q.key)).join("")}</ul>
+      return `<div class="item">${head}${pick ? histLine(itemHistory(pick, found)) : ""}<ul class="offers">${shown.map(o => offerRow(o, o === pick, q.key)).join("")}</ul>
         ${found.length > limit ? `<div class="more"><button class="link" data-expand="${esc(q.key)}" type="button">Mostra altre ${found.length - limit} offerte</button></div>` : ""}</div>`;
     }).join("");
   }
@@ -699,6 +936,25 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
       : `<li class="empty">Nessuna offerta per “${esc(raw)}”.</li>`;
   }
 
+  function renderDeals() {
+    const box = $("deals-results"), n = HIST ? Object.keys(HIST).length : 0;
+    const days = HIST ? new Set(Object.values(HIST).map(r => r.seen)).size : 0;
+    const deals = [];
+    if (HIST) for (const o of visibleOffers()) {
+      if (Date.parse(o.from) > Date.now()) continue;
+      const st = offerStats(o); if (!st) continue;
+      const low = st.v <= st.min.v + 0.005, drop = 1 - st.v / st.med;
+      if (low || drop >= 0.15) deals.push({ o: Object.assign(Object.create(o), { _tier: 0 }), low, drop, st });
+    }
+    deals.sort((a, b) => b.low - a.low || b.drop - a.drop);
+    $("deals-note").textContent = HIST
+      ? `Offerte al minimo storico o molto sotto il prezzo tipico, sui ${n} prezzi registrati. Lo storico cresce ogni giorno: più passa il tempo, più i confronti sono affidabili.`
+      : "Lo storico dei prezzi non è disponibile.";
+    box.innerHTML = deals.length
+      ? deals.slice(0, 100).map(d => offerRow(d.o, false, null).replace(`<div class="o-meta">`, `<div class="o-meta">${d.drop > 0.005 ? `<span class="tag save">−${Math.round(d.drop * 100)}% vs tipico</span>` : ""}`)).join("")
+      : `<li class="empty">Nessuna occasione per ora: servono almeno ${MIN_OBS} volantini per prodotto e lo storico sta ancora crescendo${days ? " (" + days + (days === 1 ? " giorno" : " giorni") + " di dati)" : ""}.</li>`;
+  }
+
   function renderToggles() {
     $("store-toggles").innerHTML = STORES.map(s =>
       `<button type="button" class="store-toggle" data-store="${s.key}" aria-pressed="${state.stores.includes(s.key)}"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</button>`).join("");
@@ -707,7 +963,7 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
   function render() {
     renderToggles();
     const items = computeItems();
-    renderList(items); renderSummary(items); renderBrowse();
+    renderList(items); renderSummary(items); renderBrowse(); renderDeals();
   }
 
   // ---------- events ----------
@@ -744,17 +1000,20 @@ window.EMBEDDED_OFFERS = window.EMBEDDED_OFFERS || null; /*__EMBEDDED__*/
     const el = e.target.closest(".offer[data-item]"); if (el) { e.preventDefault(); choose(el); }
   });
   function tab(which) {
-    const list = which === "list";
-    $("tab-list").setAttribute("aria-selected", list); $("tab-browse").setAttribute("aria-selected", !list);
-    $("view-list").hidden = !list; $("view-browse").hidden = list;
-    if (!list) $("q").focus();
+    for (const t of ["list", "browse", "deals"]) {
+      $("tab-" + t).setAttribute("aria-selected", t === which); $("view-" + t).hidden = t !== which;
+    }
+    if (which === "browse") $("q").focus();
   }
   $("tab-list").addEventListener("click", () => tab("list"));
   $("tab-browse").addEventListener("click", () => tab("browse"));
+  $("tab-deals").addEventListener("click", () => tab("deals"));
   if (SNAPSHOT) $("refresh").title = "In questa copia le offerte sono salvate al momento della pubblicazione";
 
   load(false);
   if (!SNAPSHOT) {
+    fetch("data/history.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : null)
+      .then(h => { if (h && typeof h === "object") { HIST = h; render(); } }).catch(() => {});
     document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastCheck > 60e3) sync(false); });
     setInterval(() => { if (!document.hidden) sync(false); }, 30 * 60e3);
     window.addEventListener("online", () => sync(false));
