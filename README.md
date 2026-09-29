@@ -4,9 +4,17 @@ Confronta le offerte dei volantini di **Lidl, Føtex, Bilka, Netto e REMA 1000**
 
 I dati vengono dall'API pubblica di eTilbudsavis/Tjek (`squid-api.tjek.com`), la stessa usata dall'app eTilbudsavis: nessuna chiave o registrazione.
 
-## App web (`index.html`)
+## Installazione su iPhone e Mac (una volta sola)
 
-Apri `index.html` nel browser (doppio clic, oppure pubblicalo con GitHub Pages: *Settings → Pages → Deploy from branch*).
+1. Su GitHub: **Settings → Pages → Build and deployment → Deploy from a branch**, scegli `claude/eloquent-franklin-9e2ymb` e `/ (root)`, poi *Save*. Dopo un minuto l'app è su **https://frankdinapoli.github.io/avis/**.
+2. **iPhone**: apri il link in Safari → Condividi → *Aggiungi alla schermata Home*.
+3. **Mac**: apri il link in Safari → File → *Aggiungi al Dock*.
+
+## Aggiornamento automatico
+
+Ogni volta che apri l'app (o torni su di essa, e ogni 30 minuti mentre è aperta) controlla l'elenco dei volantini di ogni catena. Scarica di nuovo le offerte solo dei negozi il cui volantino è cambiato o scaduto, e programma da sola il controllo successivo alla prossima data di inizio o fine di un volantino. Se sei offline usa le offerte salvate. Il pulsante di aggiornamento resta disponibile per forzare il download.
+
+## App web (`index.html`)
 
 - Scrivi la lista, un prodotto per riga, in danese o in italiano (`latte` → `mælk`, `pollo` → `kylling`, …).
 - `2x kaffe` indica la quantità, `ost -flødeost` esclude una parola, `hakket|fars` accetta l'una o l'altra.
