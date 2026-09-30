@@ -233,7 +233,7 @@
     var said = cleanAlt(text);
     var shown = hits.filter(function (v) { return !altsOf(v).every(function (a) { return said.indexOf(a) >= 0; }); });
     var flat = pos.reduce(function (x, y) { return x.concat(y); }, []).join(" ");
-    return { raw: line.trim(), text: text, qty: qty, amount: pa.amount, translated: shown.length ? shown.join(" ") : null,
+    return { raw: line.trim(), text: text, qty: qty, amount: pa.amount, translated: shown.length ? shown.map(function (v) { var a = v.split("|"); return a.length > 2 ? a[0] + " …" : a.join(" o "); }).join(" ") : null,
       pos: pos, neg: neg, key: norm(line), coldcut: COLDCUT.test(flat) };
   }
 
