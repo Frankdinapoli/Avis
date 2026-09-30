@@ -173,7 +173,7 @@ table.stores-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; padding: 3px; margin-bottom: 16px; background: var(--line); border-radius: 12px; max-width: 520px; }
 .tabs button { border: 0; border-radius: 9px; background: none; min-height: 40px; padding: 0 10px; color: var(--muted); font-weight: 600; }
-.hist { margin: 0 0 8px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.hist { margin: 0; padding: 0 16px 12px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .hist b { color: var(--ink); }
 .tag.low { background: var(--good); color: #fff; }
 .hist .tag { white-space: normal; }
@@ -328,7 +328,7 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     list: store.get("avis-list", EXAMPLE),
     chosen: store.get("avis-chosen", {}),
     stores: store.get("avis-stores", STORES.map(s => s.key)),
-    sort: store.get("avis-sort", "price"),
+    sort: store.get("avis-sort2", "unit"),
     desc: store.get("avis-desc", false),
     future: store.get("avis-future", true),
     expanded: {},
@@ -536,7 +536,10 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
       const k = r.s + "|" + r.from; if (!obs.has(k) || obs.get(k).v > r.v) obs.set(k, r);
     }
     const st = statsOf(obs.values());
-    return st && Object.assign({ v: m.v, un: m.un }, st);
+    // Judge the best price available now for this item, not just the offer currently picked.
+    let v = m.v;
+    for (const o of found) { if (o._tier !== 1) continue; const x = metricOf(o); if (x.un === m.un && x.v < v) v = x.v; }
+    return st && Object.assign({ v, un: m.un }, st);
   }
   function histLine(st) {
     if (!st) return `<div class="hist">Storico prezzi: dati ancora insufficienti (servono almeno ${MIN_OBS} volantini diversi).</div>`;
@@ -715,7 +718,7 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     clearTimeout(t); t = setTimeout(render, 250);
   });
   $("example").addEventListener("click", () => { $("list").value = state.list = EXAMPLE; store.set("avis-list", EXAMPLE); render(); });
-  $("sort").addEventListener("change", e => { state.sort = e.target.value; store.set("avis-sort", state.sort); render(); });
+  $("sort").addEventListener("change", e => { state.sort = e.target.value; store.set("avis-sort2", state.sort); render(); });
   $("desc").addEventListener("change", e => { state.desc = e.target.checked; store.set("avis-desc", state.desc); render(); });
   $("future").addEventListener("change", e => { state.future = e.target.checked; store.set("avis-future", state.future); render(); });
   $("refresh").addEventListener("click", () => load(true));
