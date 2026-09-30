@@ -12,7 +12,8 @@
   "broccoli": "broccoli", "mele": "æbler", "mela": "æble", "banane": "bananer", "arance": "appelsiner",
   "limoni": "citroner", "uva": "vindruer", "fragole": "jordbær", "pere": "pærer", "avocado": "avocado",
   "pollo": "kylling", "petto di pollo": "kyllingebryst", "manzo": "okse", "maiale": "gris|svin",
-  "carne macinata": "hakket|fars", "macinato": "hakket|fars", "salsiccia": "pølse", "salsicce": "pølser",
+  "carne macinata": "hakket oksekød|hakket okse|hakket grisekød|hakket gris|hakket svinekød|hakket kalvekød|hakket kalv|hakket kyllingekød|hakket kylling|hakket kød|hakkekød|fars", "hakkekød": "hakket oksekød|hakket okse|hakket grisekød|hakket gris|hakket svinekød|hakket kalvekød|hakket kalv|hakket kyllingekød|hakket kylling|hakket kød|hakkekød|fars", "hakkekod": "hakket oksekød|hakket okse|hakket grisekød|hakket gris|hakket svinekød|hakket kalvekød|hakket kalv|hakket kyllingekød|hakket kylling|hakket kød|hakkekød|fars", "fars": "hakket oksekød|hakket okse|hakket grisekød|hakket gris|hakket svinekød|hakket kalvekød|hakket kalv|hakket kyllingekød|hakket kylling|hakket kød|hakkekød|fars",
+  "svinekød": "grisekød|svinekød", "grisekød": "grisekød|svinekød", "oksekød": "oksekød", "macinato": "hakket oksekød|hakket okse|hakket grisekød|hakket gris|hakket svinekød|hakket kalvekød|hakket kalv|hakket kyllingekød|hakket kylling|hakket kød|hakkekød|fars", "salsiccia": "pølse", "salsicce": "pølser",
   "prosciutto": "skinke", "pancetta": "bacon", "salmone": "laks", "tonno": "tun", "pesce": "fisk",
   "gamberi": "rejer", "birra": "øl", "vino": "vin", "vino rosso": "rødvin", "vino bianco": "hvidvin",
   "acqua": "vand", "succo": "juice", "cioccolato": "chokolade", "biscotti": "kiks|småkager",
@@ -174,13 +175,21 @@
   var PREPS = { med: 1, i: 1, til: 1, af: 1, uden: 1 };
   var ADJ = {};
   ("okologisk okologiske oko frisk friske danske dansk flere varianter forskellige udvalgte original classic gold zero light " +
-   "hele hel store stor sma lille mini ny nye").split(" ").forEach(function (w) { ADJ[w] = 1; });
+   "naturel hele hel store stor sma lille mini ny nye").split(" ").forEach(function (w) { ADJ[w] = 1; });
+  // Query words that only qualify a product ("coca cola zero"): ignored when other words are present.
+  var SOFT = { zero: 1, light: 1, classic: 1, original: 1 };
+  // Compounds "<prefix><term>" that are a different thing than the term (flower bulbs, cauliflower rice, soda, turkey bacon).
+  var NOT_THE_TERM = { log: /^(blomster|tulipan|krokus|hyacint|narcis)$/, ris: /^(blomkals?|broccolis?)$/,
+    vand: /^(soda)$/, bacon: /^(kalkun)$/ };
+  // Processed / variant forms: related to the product, never the product itself (unless the query asks for them).
+  var VARIANT_RE = /\b(indbagt\w*|panere\w*|fiskefrikadelle\w*|fiskepind\w*|fugtig\w*|marinere\w*|\w*mix|bbq)\b/;
+  var PRE_FORM = { hakket: 1 }; // "hakket grisekød" is hakket (mince) even though the head is grisekød
   var UNITW = { g: 1, kg: 1, l: 1, ml: 1, cl: 1, dl: 1, stk: 1, pk: 1, ps: 1, pct: 1, x: 1, gr: 1 };
   var BRANDS = {};
   "nutella barilla philadelphia pepsi fanta sprite coca cola cocacola lavazza nescafe merrild arla lurpak gevalia".split(" ").forEach(function (w) { BRANDS[w] = 1; });
   var FORM_RE = new RegExp("^e?(?:filet|fileter|inderfilet|inderfileter|brystfilet|stykker|tern|strimler|bryst|lar|vinger|kod|bonner|mix)$");
   var FLAVOR_RE = /(kakao|chokolade|jordbaer|vanilje|banan|karamel|lakrids|smag)/;
-  var COLDCUT = /(paleg|skinke|salami|pate|leverpostej|skive|hamburgerryg|rullepolse|mortadella|kalkun|bacon)/;
+  var COLDCUT = /(paleg|bacon|skinke|salami|pate|leverpostej|skive|hamburgerryg|rullepolse|mortadella|kalkun)/;
   var STRONG_RE = /\b(bistro|menu|kombi\w*|velg mellem|ved kob af (?!flere|mere|mindst|\d)|nar du kober)\b/;
 
   // ---- query parsing ----
@@ -210,6 +219,7 @@
     if (dict(phrase)) pos.push(altsOf(dict(phrase)));
     else phrase.split(" ").forEach(function (tok) {
       if (!tok) return;
+      if (SOFT[fold(tok)] && phrase.indexOf(" ") > 0) return;
       if (tok[0] === "-") { fold(tok).split(/[^\p{L}\p{N}]+/u).filter(Boolean).forEach(function (n) { neg.push(n); }); return; }
       var whole = dict(tok);
       if (whole) { pos.push(altsOf(whole)); return; }
@@ -254,6 +264,7 @@
     if (CAT[w] && CAT[w].indexOf(term) >= 0) return 1;
     if (term.length >= 3 && w.length > term.length) {
       if (w.slice(-term.length) === term) {
+        if (NOT_THE_TERM[term] && NOT_THE_TERM[term].test(w.slice(0, w.length - term.length))) return 2;
         // "kakaoskummetmælk" is chocolate milk, not plain milk
         return /melk$/.test(term) && FLAVOR_RE.test(w.slice(0, w.length - term.length)) && !FLAVOR_RE.test(term) ? 2 : 1;
       }
@@ -295,7 +306,7 @@
     var consider = function (m, i, joined) {
       if (!m) return;
       if (i >= alt.zone) m = Math.max(m, 2);
-      else if (isHead && i !== alt.head && !BRANDS[term] && !kindOfHead(term, alt) && !(alt.brand === term && i === 0)) m = Math.max(m, 2);
+      else if (isHead && i !== alt.head && !BRANDS[term] && !PRE_FORM[term] && !kindOfHead(term, alt) && !(alt.brand === term && i === 0)) m = Math.max(m, 2);
       if (!best || m < best) best = m;
     };
     for (var i = 0; i < alt.w.length; i++) {
@@ -356,6 +367,8 @@
       if (h.indexOf("paleg") >= 0) return 2;
       if (/\bskive[rt]\b/.test(h) && !/brod/.test(h)) return 2;
     }
+    var qf = fold(q.text), vm = h.match(VARIANT_RE);
+    if (vm && qf.indexOf(vm[1]) < 0) return 2;
     if (STRONG_RE.test(h) || STRONG_RE.test(d)) return 2;
     if (/ med /.test(" " + h.replace(/[^\p{L}\p{N}]+/gu, " ") + " ") && !/ med /.test(" " + fold(q.text) + " ")) return Math.min(t + 0.25, 1.99);
     return t;

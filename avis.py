@@ -11,6 +11,7 @@ Solo libreria standard, nessuna dipendenza.
 import json
 import sys
 import time
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -48,15 +49,26 @@ def trim(o):
     }
 
 
+def get_json(url):
+    for attempt in range(3):  # the API occasionally answers 5xx; retry briefly
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:
+                return json.load(r)
+        except urllib.error.HTTPError:
+            if attempt == 2:
+                raise
+            time.sleep(2 * (attempt + 1))
+
+
 def fetch_store(store_id):
+    """Offers are paged per flyer: the API stops at offset 1000 per query."""
     out = []
-    for offset in range(0, 5000, 100):
-        url = f"{API}?dealer_ids={store_id}&limit=100&offset={offset}"
-        with urllib.request.urlopen(url, timeout=30) as r:
-            page = json.load(r)
-        out += [trim(o) for o in page]
-        if len(page) < 100:
-            break
+    for cat in get_json(f"https://squid-api.tjek.com/v2/catalogs?dealer_ids={store_id}&limit=100"):
+        for offset in range(0, 1000, 100):
+            page = get_json(f"{API}?catalog_ids={cat['id']}&limit=100&offset={offset}")
+            out += [trim(o) for o in page]
+            if len(page) < 100:
+                break
     return out
 
 

@@ -33,6 +33,7 @@
   {"q":"carne macinata","top":"Hakket"},
   {"q":"skyr","top":"Skyr"},
   {"q":"toiletpapir","notTier1":["Fugtigt"]},
-  {"q":"bacon","notTier1":["pålæg","kalkunbacon"]},
-  {"q":"kyllingebryst","notTier1":["lårmix"]}
+  {"q":"bacon","top":"Bacon","notTier1":["kalkunbacon"]},
+  {"q":"kyllingebryst","notTier1":["lårmix"]},
+  {"q":"500g hakkekød","top":"akket","notTier1":["spinat"]}
 ]

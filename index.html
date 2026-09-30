@@ -346,14 +346,19 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     };
   }
 
+  // Offers are paged per flyer: the API stops at offset 1000 per query and Bilka alone can exceed that.
   async function fetchStore(s) {
     const out = [];
-    for (let offset = 0; offset < 5000; offset += 100) {
-      const r = await fetch(`${API}?dealer_ids=${s.id}&limit=100&offset=${offset}`);
-      if (!r.ok) throw new Error(`${s.name}: HTTP ${r.status}`);
-      const page = await r.json();
-      out.push(...page.map(trim));
-      if (page.length < 100) break;
+    for (const c of await fetchCatalogs(s)) {
+      for (let offset = 0; offset < 1000; offset += 100) {
+        const url = `${API}?catalog_ids=${c.id}&limit=100&offset=${offset}`;
+        let r = await fetch(url);
+        if (!r.ok) { await new Promise(res => setTimeout(res, 1500)); r = await fetch(url); }  // one retry on API hiccups
+        if (!r.ok) throw new Error(`${s.name}: HTTP ${r.status}`);
+        const page = await r.json();
+        out.push(...page.map(trim));
+        if (page.length < 100) break;
+      }
     }
     return out;
   }
