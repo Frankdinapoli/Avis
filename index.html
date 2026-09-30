@@ -92,6 +92,16 @@ details[open] .chev { transform: rotate(180deg); }
 .editor-body { padding: 0 16px 14px; display: grid; gap: 8px; }
 .editor-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 textarea { width: 100%; min-height: 150px; resize: vertical; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: 16px/1.6 var(--font-mono); }
+.sync { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.sync[hidden], .sync-row[hidden] { display: none; }
+.sync-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.sync-row input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink); font: inherit; font-size: 16px; }
+.sync .err { color: var(--warn); }
+.sugg { margin-bottom: 16px; display: grid; gap: 8px; }
+.sugg[hidden] { display: none; }
+.sugg-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.sugg-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); cursor: pointer; font-family: inherit; }
+.sugg-chip .tag { font-size: 11px; }
 .hint { font-size: 13px; color: var(--muted); margin: 0; }
 .hint code { font-family: var(--font-mono); font-size: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .controls { display: grid; gap: 10px; margin-bottom: 16px; padding: 12px; }
@@ -240,8 +250,15 @@ footer { margin-top: 28px; font-size: 12px; color: var(--muted); }
               <code>2x kaffe</code> = quantità, <code>-parola</code> esclude, <code>a|b</code> l'una o l'altra.
               Tocca un'offerta per sceglierla al posto della più economica.
             </p>
+            <div class="sync" id="sync" hidden>
+              <span class="label">Sincronizza</span>
+              <p class="hint">Stessa lista su iPhone e Mac con un Gist privato di GitHub. <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Avis%20Tilbud" target="_blank" rel="noopener">Crea il token</a> (solo permesso gist) e incollalo qui.</p>
+              <form class="sync-row" id="sync-form"><input id="sync-token" type="password" autocomplete="off" placeholder="Incolla il token" aria-label="Token GitHub"><button class="link" type="submit">Salva</button></form>
+              <div class="sync-row" id="sync-on" hidden><span class="hint" id="sync-st"></span><button id="sync-off" class="link" type="button">Disconnetti</button></div>
+            </div>
           </div>
         </details>
+        <div class="sugg" id="sugg" hidden></div>
         <div class="panel controls">
           <div class="stores" id="store-toggles"></div>
           <div class="opts">
@@ -253,6 +270,10 @@ footer { margin-top: 28px; font-size: 12px; color: var(--muted); }
             </label>
             <label class="check"><input type="checkbox" id="desc"> cerca nella descrizione</label>
             <label class="check"><input type="checkbox" id="future" checked> volantini in arrivo</label>
+            <label class="check" for="limit">Al massimo
+              <select id="limit"><option value="0">tutti</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+              negozi
+            </label>
           </div>
         </div>
         <div class="items" id="items"></div>
@@ -332,6 +353,9 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     desc: store.get("avis-desc", false),
     future: store.get("avis-future", true),
     expanded: {},
+    limit: +store.get("avis-limit", 0) || 0,
+    freq: store.get("avis-freq", {}),
+    updatedAt: +store.get("avis-updated", 0) || 0,
   };
 
   // ---------- data ----------
@@ -592,12 +616,34 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     const pool = visibleOffers();
     const lines = state.list.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
     const seen = new Set();
-    return lines.map(parseLine).filter(q => !seen.has(q.key) && seen.add(q.key)).map(q => {
+    return applyLimit(lines.map(parseLine).filter(q => !seen.has(q.key) && seen.add(q.key)).map(q => {
       const found = findOffers(pool, q);
       const pick = found.find(o => o.id === state.chosen[q.key]) || (found[0] && found[0]._tier === 1 ? found[0] : null);
       found.q = q;
       return { q, found, pick };
-    });
+    }));
+  }
+
+  // Optional cap on the number of stores: best subset covers most items, then costs least.
+  function applyLimit(items) {
+    const N = state.limit, on = STORES.map(s => s.key).filter(k => state.stores.includes(k));
+    if (!N || on.length <= N) return items;
+    const best = (i, set) => i.found.reduce((b, o) => (o._tier === 1 && set.has(o.s) && (!b || cost(o) < cost(b)) ? o : b), null);
+    let top = null;
+    const walk = (start, cur) => {
+      if (cur.length) {
+        const set = new Set(cur);
+        let n = 0, sum = 0;
+        for (const i of items) { const b = best(i, set); if (b) { n++; sum += cost(b) * i.q.qty; } }
+        if (!top || n > top.n || (n === top.n && (sum < top.sum - 0.005 || (Math.abs(sum - top.sum) <= 0.005 && cur.length < top.keys.length)))) top = { n, sum, keys: [...cur] };
+      }
+      if (cur.length < N) for (let k = start; k < on.length; k++) walk(k + 1, [...cur, on[k]]);
+    };
+    walk(0, []);
+    const set = new Set(top.keys);
+    for (const i of items) i.pick = best(i, set);
+    items.lim = { keys: top.keys, outside: items.filter(i => !i.pick && i.found.some(o => o._tier === 1)).length };
+    return items;
   }
 
   function renderList(items) {
@@ -657,6 +703,7 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
       <div class="hero">
         <div class="k">Dove comprare</div>
         <div class="big">${kr(total)}<small>kr</small></div>
+        ${items.lim ? `<div class="row"><span>Max ${state.limit}: <b>${items.lim.keys.map(k => esc(BY_KEY[k].name)).join(", ")}</b></span>${items.lim.outside ? `<span><b>${items.lim.outside}</b> ${items.lim.outside === 1 ? "prodotto fuori" : "prodotti fuori"}</span>` : ""}</div>` : ""}
         <div class="row"><span><b>${withPick.length}</b> di ${items.length} prodotti</span><span><b>${nStores}</b> ${nStores === 1 ? "negozio" : "negozi"}</span>${saved > 0 ? `<span class="sav">risparmi ${kr(saved)} kr</span>` : ""}</div>
       </div>
       <div class="receipt">
@@ -711,22 +758,152 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
   function render() {
     renderToggles();
     const items = computeItems();
-    renderList(items); renderSummary(items); renderBrowse(); renderDeals();
+    renderList(items); renderSummary(items); renderBrowse(); renderDeals(); renderSugg(items);
   }
+
+  // ---------- habits ("Compri spesso") ----------
+  const today = () => new Date().toISOString().slice(0, 10);
+  const listLines = txt => txt.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+  function recordFreq() {
+    const day = today();
+    for (const t of listLines(state.list)) {
+      const key = parseLine(t).key; if (!key) continue;
+      const r = state.freq[key];
+      if (!r) state.freq[key] = { t, n: 1, last: day };
+      else if (r.last !== day) { r.n++; r.last = day; r.t = t; }
+    }
+    const ks = Object.keys(state.freq);
+    if (ks.length > 150) ks.sort((a, b) => state.freq[b].n - state.freq[a].n || state.freq[b].last.localeCompare(state.freq[a].last))
+      .slice(150).forEach(k => delete state.freq[k]);
+    store.set("avis-freq", state.freq);
+    renderSugg();
+  }
+  function mergeFreq(rem) {
+    if (!rem || typeof rem !== "object") return;
+    for (const [k, r] of Object.entries(rem)) {
+      if (!r || typeof r.n !== "number" || typeof r.last !== "string" || typeof r.t !== "string") continue;
+      const l = state.freq[k];
+      if (!l) state.freq[k] = { t: r.t, n: r.n, last: r.last };
+      else { l.n = Math.max(l.n, r.n); if (r.last > l.last) { l.last = r.last; l.t = r.t; } }
+    }
+    store.set("avis-freq", state.freq);
+  }
+  function renderSugg(items) {
+    const box = $("sugg"); items = items || computeItems();
+    const inList = new Set(items.map(i => i.q.key)), pool = visibleOffers();
+    const c = Object.entries(state.freq).filter(([k, r]) => r.n >= 2 && !inList.has(k)).map(([k, r]) => {
+      const q = parseLine(r.t), f = findOffers(pool, q).find(o => o._tier === 1) || null;
+      return { k, r, o: f, low: !!f && !!HIST && isLow(f) };
+    }).sort((a, b) => b.low - a.low || b.r.n - a.r.n || b.r.last.localeCompare(a.r.last)).slice(0, 8);
+    box.hidden = !c.length;
+    if (!c.length) { box.innerHTML = ""; return; }
+    box.innerHTML = `<span class="label">Compri spesso</span><div class="sugg-list">` + c.map(x =>
+      `<button type="button" class="sugg-chip" data-add="${esc(x.k)}">+ ${esc(x.r.t)}${x.o ? ` <span class="tag ${x.low ? "low" : "save"}">${x.low ? "minimo · " : ""}${kr(cost(x.o))} kr · ${esc(BY_KEY[x.o.s].name)}</span>` : ""}</button>`).join("") + `</div>`;
+  }
+  $("sugg").addEventListener("click", e => {
+    const b = e.target.closest("[data-add]"); if (!b) return;
+    const r = state.freq[b.dataset.add]; if (!r) return;
+    state.list = state.list.replace(/\s+$/, "") + (state.list.trim() ? "\n" : "") + r.t;
+    $("list").value = state.list; store.set("avis-list", state.list); listEdited(); render();
+  });
+
+  // ---------- sync via GitHub Gist ----------
+  const GIST_DESC = "Avis Tilbud – lista", GIST_FILE = "avis.json";
+  const gs = { token: store.get("avis-token", ""), id: store.get("avis-gist", ""), busy: false, again: false, msg: "", err: false, timer: null };
+  const gSnap = () => ({ list: state.list, chosen: state.chosen, freq: state.freq, updatedAt: state.updatedAt });
+  async function gapi(path, method, body) {
+    const r = await fetch("https://api.github.com" + path, {
+      method: method || "GET",
+      headers: { Authorization: "Bearer " + gs.token, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!r.ok) { const e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+    return r.json();
+  }
+  function gStatus(msg, err) { gs.msg = msg; gs.err = !!err; renderSync(); }
+  function renderSync() {
+    if (SNAPSHOT) return;
+    $("sync").hidden = false;
+    $("sync-form").hidden = !!gs.token; $("sync-on").hidden = !gs.token;
+    const st = $("sync-st"); st.textContent = gs.msg || "Sincronizzazione attiva."; st.classList.toggle("err", gs.err);
+  }
+  async function gRun() {
+    if (SNAPSHOT || !gs.token) return;
+    if (gs.busy) { gs.again = true; return; }
+    gs.busy = true;
+    try {
+      if (!gs.id) {
+        const all = await gapi("/gists?per_page=100");
+        const f = all.find(g => g.description === GIST_DESC && g.files && g.files[GIST_FILE]);
+        if (f) gs.id = f.id;
+        else {
+          if (!state.updatedAt) { state.updatedAt = Date.now(); store.set("avis-updated", state.updatedAt); }
+          const c = await gapi("/gists", "POST", { description: GIST_DESC, public: false, files: { [GIST_FILE]: { content: JSON.stringify(gSnap()) } } });
+          gs.id = c.id; store.set("avis-gist", gs.id);
+          return gStatus("Sincronizzato " + new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
+        }
+        store.set("avis-gist", gs.id);
+      }
+      const g = await gapi("/gists/" + gs.id);
+      let r = null;
+      try { r = JSON.parse(g.files[GIST_FILE].content); } catch { /* empty or broken: overwrite below */ }
+      let push = true;
+      if (r && typeof r.list === "string") {
+        const before = JSON.stringify(state.freq);
+        mergeFreq(r.freq);
+        const ru = +r.updatedAt || 0;
+        if (ru > state.updatedAt) {
+          state.list = r.list; state.chosen = r.chosen && typeof r.chosen === "object" ? r.chosen : {}; state.updatedAt = ru;
+          store.set("avis-list", state.list); store.set("avis-chosen", state.chosen); store.set("avis-updated", ru);
+          $("list").value = state.list; render();
+        } else if (before !== JSON.stringify(state.freq)) renderSugg();
+        push = ru < state.updatedAt || JSON.stringify(r.freq || {}) !== JSON.stringify(state.freq);
+      }
+      if (push) await gapi("/gists/" + gs.id, "PATCH", { files: { [GIST_FILE]: { content: JSON.stringify(gSnap()) } } });
+      gStatus("Sincronizzato " + new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
+    } catch (e) {
+      if (e.status === 401 || e.status === 403) gStatus("Token non valido o senza permesso gist: disconnetti e incolla un token nuovo.", true);
+      else if (e.status === 404 && gs.id) { gs.id = ""; store.set("avis-gist", ""); gStatus("Gist non trovato: riprovo al prossimo controllo.", true); }
+      else if (e.status) gStatus("Errore GitHub (" + e.status + "): riprova più tardi.", true);
+      /* no status = offline: stay silent */
+    } finally {
+      gs.busy = false;
+      if (gs.again) { gs.again = false; gSchedule(); }
+    }
+  }
+  function gSchedule() { clearTimeout(gs.timer); gs.timer = setTimeout(gRun, 2000); }
+  // Called after every local change to list/choices: stamps it, then records habits and pushes once idle.
+  let lt;
+  function listEdited() {
+    state.updatedAt = Date.now(); store.set("avis-updated", state.updatedAt);
+    clearTimeout(lt); lt = setTimeout(() => { recordFreq(); gSchedule(); }, 2000);
+  }
+  window.__avisSync = { gs, gRun, state };
 
   // ---------- events ----------
   $("list").value = state.list;
   $("sort").value = state.sort; $("desc").checked = state.desc; $("future").checked = state.future;
   let t;
   $("list").addEventListener("input", e => {
-    state.list = e.target.value; store.set("avis-list", state.list);
+    state.list = e.target.value; store.set("avis-list", state.list); listEdited();
     clearTimeout(t); t = setTimeout(render, 250);
   });
-  $("example").addEventListener("click", () => { $("list").value = state.list = EXAMPLE; store.set("avis-list", EXAMPLE); render(); });
+  $("example").addEventListener("click", () => { $("list").value = state.list = EXAMPLE; store.set("avis-list", EXAMPLE); listEdited(); render(); });
   $("sort").addEventListener("change", e => { state.sort = e.target.value; store.set("avis-sort2", state.sort); render(); });
   $("desc").addEventListener("change", e => { state.desc = e.target.checked; store.set("avis-desc", state.desc); render(); });
   $("future").addEventListener("change", e => { state.future = e.target.checked; store.set("avis-future", state.future); render(); });
   $("refresh").addEventListener("click", () => load(true));
+  $("limit").value = String(state.limit);
+  $("limit").addEventListener("change", e => { state.limit = +e.target.value || 0; store.set("avis-limit", state.limit); render(); });
+  $("sync-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const v = $("sync-token").value.trim(); if (!v) return;
+    gs.token = v; gs.id = ""; store.set("avis-token", v); store.set("avis-gist", ""); $("sync-token").value = "";
+    gStatus("Connessione…"); gRun();
+  });
+  $("sync-off").addEventListener("click", () => {
+    gs.token = ""; gs.id = ""; store.set("avis-token", ""); store.set("avis-gist", ""); gStatus("");
+  });
   $("q").addEventListener("input", renderBrowse);
   $("store-toggles").addEventListener("click", e => {
     const b = e.target.closest("[data-store]"); if (!b) return;
@@ -736,7 +913,7 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
   });
   function choose(el) {
     const k = el.dataset.item, id = el.dataset.offer;
-    state.chosen[k] = id; store.set("avis-chosen", state.chosen); render();
+    state.chosen[k] = id; store.set("avis-chosen", state.chosen); listEdited(); render();
   }
   $("items").addEventListener("click", e => {
     const ex = e.target.closest("[data-expand]");
@@ -760,6 +937,10 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
 
   load(false);
   if (!SNAPSHOT) {
+    renderSync(); gRun();
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) gRun(); });
+    setInterval(() => { if (!document.hidden) gRun(); }, 5 * 60e3);
+    window.addEventListener("online", gRun);
     fetch("data/history.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : null)
       .then(h => { if (h && typeof h === "object") { HIST = h; render(); } }).catch(() => {});
     document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastCheck > 60e3) sync(false); });
