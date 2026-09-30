@@ -356,6 +356,7 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     limit: +store.get("avis-limit", 0) || 0,
     freq: store.get("avis-freq", {}),
     updatedAt: +store.get("avis-updated", 0) || 0,
+    syncedAt: +store.get("avis-synced", 0) || 0,
   };
 
   // ---------- data ----------
@@ -624,25 +625,32 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     }));
   }
 
-  // Optional cap on the number of stores: best subset covers most items, then costs least.
+  // Optional cap on the number of stores: cover most items (manual choices count), honour choices, then cost least.
   function applyLimit(items) {
     const N = state.limit, on = STORES.map(s => s.key).filter(k => state.stores.includes(k));
     if (!N || on.length <= N) return items;
-    const best = (i, set) => i.found.reduce((b, o) => (o._tier === 1 && set.has(o.s) && (!b || cost(o) < cost(b)) ? o : b), null);
+    const chosenOf = i => i.found.find(o => o.id === state.chosen[i.q.key]) || null;
+    const best = (i, set) => {
+      const c = chosenOf(i); if (c && set.has(c.s)) return { o: c, manual: true };
+      const o = i.found.reduce((b, o) => (o._tier === 1 && set.has(o.s) && (!b || cost(o) < cost(b)) ? o : b), null);
+      return o && { o, manual: false };
+    };
     let top = null;
     const walk = (start, cur) => {
       if (cur.length) {
         const set = new Set(cur);
-        let n = 0, sum = 0;
-        for (const i of items) { const b = best(i, set); if (b) { n++; sum += cost(b) * i.q.qty; } }
-        if (!top || n > top.n || (n === top.n && (sum < top.sum - 0.005 || (Math.abs(sum - top.sum) <= 0.005 && cur.length < top.keys.length)))) top = { n, sum, keys: [...cur] };
+        let n = 0, m = 0, sum = 0;
+        for (const i of items) { const b = best(i, set); if (b) { n++; if (b.manual) m++; sum += cost(b.o) * i.q.qty; } }
+        const better = !top || n !== top.n ? !top || n > top.n : m !== top.m ? m > top.m
+          : Math.abs(sum - top.sum) > 0.005 ? sum < top.sum : cur.length < top.keys.length;
+        if (better) top = { n, m, sum, keys: [...cur] };
       }
       if (cur.length < N) for (let k = start; k < on.length; k++) walk(k + 1, [...cur, on[k]]);
     };
     walk(0, []);
     const set = new Set(top.keys);
-    for (const i of items) i.pick = best(i, set);
-    items.lim = { keys: top.keys, outside: items.filter(i => !i.pick && i.found.some(o => o._tier === 1)).length };
+    for (const i of items) { const b = best(i, set); i.pick = b && b.o; }
+    items.lim = { keys: top.keys, outside: items.filter(i => !i.pick && (chosenOf(i) || i.found.some(o => o._tier === 1))).length };
     return items;
   }
 
@@ -714,7 +722,7 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
         <h2 style="margin-bottom:8px">Tutto in un solo negozio</h2>
         <table class="stores-tbl">
           <thead><tr><th>Negozio</th><th style="text-align:right">Prodotti</th><th style="text-align:right">Totale</th></tr></thead>
-          <tbody>${single.map((r, idx) => `<tr class="${idx === 0 && r.n ? "top" : ""}"><td>${chip(r.s.key)}</td><td class="n">${r.n}/${items.length}</td><td class="n">${r.n ? kr(r.sum) : "—"}</td></tr>`).join("")}</tbody>
+          <tbody>${single.map((r, idx) => `<tr class="${idx === 0 && r.n ? "top" : ""}"${items.lim && !items.lim.keys.includes(r.s.key) ? ' style="opacity:.5"' : ""}><td>${chip(r.s.key)}${items.lim && items.lim.keys.includes(r.s.key) ? ' <span class="tag">scelto</span>' : ""}</td><td class="n">${r.n}/${items.length}</td><td class="n">${r.n ? kr(r.sum) : "—"}</td></tr>`).join("")}</tbody>
         </table>
         <p class="hint" style="margin-top:8px">Il totale conta solo i prodotti trovati in quel negozio.</p>
       </div>`;
@@ -762,22 +770,36 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
   }
 
   // ---------- habits ("Compri spesso") ----------
-  const today = () => new Date().toISOString().slice(0, 10);
+  const DAY = 864e5, today = () => new Date().toISOString().slice(0, 10);
+  const daysSince = d => (Date.now() - Date.parse(d)) / DAY;
   const listLines = txt => txt.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
-  function recordFreq() {
-    const day = today();
-    for (const t of listLines(state.list)) {
-      const key = parseLine(t).key; if (!key) continue;
-      const r = state.freq[key];
-      if (!r) state.freq[key] = { t, n: 1, last: day };
-      else if (r.last !== day) { r.n++; r.last = day; r.t = t; }
-    }
+  // Normalized habit key: quantity/amount stripped, translated to Danish, folded.
+  const fkey = q => q.pos.map(a => a.slice().sort().join("|")).sort().join(" ");
+  function pruneFreq() {
+    for (const [k, r] of Object.entries(state.freq)) if (r.n <= 1 && daysSince(r.last) > 30) delete state.freq[k];
     const ks = Object.keys(state.freq);
     if (ks.length > 150) ks.sort((a, b) => state.freq[b].n - state.freq[a].n || state.freq[b].last.localeCompare(state.freq[a].last))
       .slice(150).forEach(k => delete state.freq[k]);
-    store.set("avis-freq", state.freq);
-    renderSugg();
   }
+  const listKeys = () => listLines(state.list).map(l => fkey(parseLine(l))).filter(Boolean);
+  // Count items newly ADDED to the list (vs the previous recorded list), once per day, only if they match something.
+  function recordFreq() {
+    if (!SNAPSHOT_READY()) return;
+    const prev = store.get("avis-prevkeys", null), day = today(), prevSet = new Set(prev || []);
+    if (prev) for (const l of listLines(state.list)) {
+      const q = parseLine(l), k = fkey(q);
+      if (!k || prevSet.has(k)) continue;
+      if (!q.translated && !findOffers(state.offers, q).some(o => o._tier === 1)) continue;
+      const r = state.freq[k];
+      if (!r) state.freq[k] = { t: q.text, n: 1, last: day };
+      else if (r.last !== day) { r.n++; r.last = day; r.t = q.text; }
+    }
+    // items that match nothing yet are not baselined, so they can still count once they do
+    const keep = listLines(state.list).map(l => parseLine(l)).filter(q => fkey(q) && (q.translated || findOffers(state.offers, q).some(o => o._tier === 1))).map(fkey);
+    store.set("avis-prevkeys", prev ? [...new Set([...prev.filter(k => listKeys().includes(k)), ...keep])] : listKeys());
+    pruneFreq(); store.set("avis-freq", state.freq); renderSugg(); gSchedule();
+  }
+  const SNAPSHOT_READY = () => state.offers.length > 0;
   function mergeFreq(rem) {
     if (!rem || typeof rem !== "object") return;
     for (const [k, r] of Object.entries(rem)) {
@@ -786,12 +808,13 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
       if (!l) state.freq[k] = { t: r.t, n: r.n, last: r.last };
       else { l.n = Math.max(l.n, r.n); if (r.last > l.last) { l.last = r.last; l.t = r.t; } }
     }
-    store.set("avis-freq", state.freq);
+    pruneFreq(); store.set("avis-freq", state.freq);
   }
+  const canonFreq = f => JSON.stringify(Object.keys(f || {}).sort().map(k => [k, f[k].n, f[k].last]));
   function renderSugg(items) {
     const box = $("sugg"); items = items || computeItems();
-    const inList = new Set(items.map(i => i.q.key)), pool = visibleOffers();
-    const c = Object.entries(state.freq).filter(([k, r]) => r.n >= 2 && !inList.has(k)).map(([k, r]) => {
+    const inList = new Set(items.map(i => fkey(i.q))), pool = visibleOffers();
+    const c = Object.entries(state.freq).filter(([k, r]) => (r.n >= 2 || daysSince(r.last) > 5) && !inList.has(k)).map(([k, r]) => {
       const q = parseLine(r.t), f = findOffers(pool, q).find(o => o._tier === 1) || null;
       return { k, r, o: f, low: !!f && !!HIST && isLow(f) };
     }).sort((a, b) => b.low - a.low || b.r.n - a.r.n || b.r.last.localeCompare(a.r.last)).slice(0, 8);
@@ -809,15 +832,21 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
 
   // ---------- sync via GitHub Gist ----------
   const GIST_DESC = "Avis Tilbud – lista", GIST_FILE = "avis.json";
-  const gs = { token: store.get("avis-token", ""), id: store.get("avis-gist", ""), busy: false, again: false, msg: "", err: false, timer: null };
+  const gs = { token: store.get("avis-token", ""), id: store.get("avis-gist", ""), remote: +store.get("avis-remote", 0) || 0, busy: false, again: false, msg: "", err: false, timer: null };
   const gSnap = () => ({ list: state.list, chosen: state.chosen, freq: state.freq, updatedAt: state.updatedAt });
+  const hhmm = () => new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
   async function gapi(path, method, body) {
     const r = await fetch("https://api.github.com" + path, {
       method: method || "GET",
       headers: { Authorization: "Bearer " + gs.token, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (!r.ok) { const e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+    if (!r.ok) {
+      const e = new Error("HTTP " + r.status); e.status = r.status;
+      const h = n => (r.headers && r.headers.get && r.headers.get(n));
+      e.rate = r.status === 429 || (r.status === 403 && (h("x-ratelimit-remaining") === "0" || h("retry-after") != null));
+      throw e;
+    }
     return r.json();
   }
   function gStatus(msg, err) { gs.msg = msg; gs.err = !!err; renderSync(); }
@@ -827,20 +856,33 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     $("sync-form").hidden = !!gs.token; $("sync-on").hidden = !gs.token;
     const st = $("sync-st"); st.textContent = gs.msg || "Sincronizzazione attiva."; st.classList.toggle("err", gs.err);
   }
+  async function gFind() {
+    for (let page = 1; page <= 10; page++) {
+      const all = await gapi("/gists?per_page=100&page=" + page);
+      const f = all.find(g => g.description === GIST_DESC && g.files && g.files[GIST_FILE]);
+      if (f) return f.id;
+      if (all.length < 100) break;
+    }
+    return "";
+  }
+  const stamp = min => { state.updatedAt = Math.max(Date.now(), state.updatedAt + 1, min || 0); store.set("avis-updated", state.updatedAt); };
+  function setBase() { store.set("avis-prevkeys", listKeys()); }
+  function localSaved() { store.set("avis-list", state.list); store.set("avis-chosen", state.chosen); $("list").value = state.list; setBase(); render(); }
   async function gRun() {
     if (SNAPSHOT || !gs.token) return;
     if (gs.busy) { gs.again = true; return; }
     gs.busy = true;
     try {
+      let first = false;
       if (!gs.id) {
-        const all = await gapi("/gists?per_page=100");
-        const f = all.find(g => g.description === GIST_DESC && g.files && g.files[GIST_FILE]);
-        if (f) gs.id = f.id;
-        else {
-          if (!state.updatedAt) { state.updatedAt = Date.now(); store.set("avis-updated", state.updatedAt); }
+        gs.id = await gFind(); first = !!gs.id;
+        if (!gs.id) {
+          if (!state.updatedAt) stamp();
+          const sent = state.updatedAt;
           const c = await gapi("/gists", "POST", { description: GIST_DESC, public: false, files: { [GIST_FILE]: { content: JSON.stringify(gSnap()) } } });
-          gs.id = c.id; store.set("avis-gist", gs.id);
-          return gStatus("Sincronizzato " + new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
+          gs.id = c.id; gs.remote = sent; state.syncedAt = sent;
+          store.set("avis-gist", gs.id); store.set("avis-remote", sent); store.set("avis-synced", sent);
+          return gStatus("Sincronizzato " + hhmm());
         }
         store.set("avis-gist", gs.id);
       }
@@ -849,20 +891,42 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
       try { r = JSON.parse(g.files[GIST_FILE].content); } catch { /* empty or broken: overwrite below */ }
       let push = true;
       if (r && typeof r.list === "string") {
-        const before = JSON.stringify(state.freq);
+        const ru = +r.updatedAt || 0, before = canonFreq(state.freq);
         mergeFreq(r.freq);
-        const ru = +r.updatedAt || 0;
-        if (ru > state.updatedAt) {
-          state.list = r.list; state.chosen = r.chosen && typeof r.chosen === "object" ? r.chosen : {}; state.updatedAt = ru;
-          store.set("avis-list", state.list); store.set("avis-chosen", state.chosen); store.set("avis-updated", ru);
-          $("list").value = state.list; render();
-        } else if (before !== JSON.stringify(state.freq)) renderSugg();
-        push = ru < state.updatedAt || JSON.stringify(r.freq || {}) !== JSON.stringify(state.freq);
+        const dirty = state.updatedAt > state.syncedAt, changed = first || ru !== gs.remote;
+        if (changed && (dirty || first)) {
+          // both sides have news: merge, never drop anything
+          const seen = new Set(), lines = [];
+          for (const l of [...state.list.split("\n"), ...r.list.split("\n")]) {
+            const t = l.trim(); if (!t) continue;
+            const k = parseLine(t).key; if (seen.has(k)) continue; seen.add(k); lines.push(t);
+          }
+          const merged = lines.join("\n");
+          if (merged !== state.list || JSON.stringify(state.chosen) !== JSON.stringify(Object.assign({}, r.chosen, state.chosen))) {
+            state.list = merged; state.chosen = Object.assign({}, r.chosen && typeof r.chosen === "object" ? r.chosen : {}, state.chosen);
+            localSaved();
+          }
+          stamp(ru + 1); push = true;
+        } else if (changed) {
+          state.list = r.list; state.chosen = r.chosen && typeof r.chosen === "object" ? r.chosen : {};
+          state.updatedAt = Math.max(ru, state.updatedAt); store.set("avis-updated", state.updatedAt);
+          state.syncedAt = state.updatedAt; store.set("avis-synced", state.syncedAt); gs.remote = ru; store.set("avis-remote", ru);
+          localSaved();
+          push = canonFreq(r.freq) !== canonFreq(state.freq);
+        } else {
+          if (before !== canonFreq(state.freq)) renderSugg();
+          push = dirty || canonFreq(r.freq) !== canonFreq(state.freq);
+        }
       }
-      if (push) await gapi("/gists/" + gs.id, "PATCH", { files: { [GIST_FILE]: { content: JSON.stringify(gSnap()) } } });
-      gStatus("Sincronizzato " + new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
+      if (push) {
+        const sent = state.updatedAt;
+        await gapi("/gists/" + gs.id, "PATCH", { files: { [GIST_FILE]: { content: JSON.stringify(gSnap()) } } });
+        gs.remote = sent; state.syncedAt = sent; store.set("avis-remote", sent); store.set("avis-synced", sent);
+      }
+      gStatus("Sincronizzato " + hhmm());
     } catch (e) {
-      if (e.status === 401 || e.status === 403) gStatus("Token non valido o senza permesso gist: disconnetti e incolla un token nuovo.", true);
+      if (e.rate) gStatus("Limite GitHub raggiunto, riprovo più tardi.", true);
+      else if (e.status === 401 || e.status === 403) gStatus("Token non valido o senza permesso gist: disconnetti e incolla un token nuovo.", true);
       else if (e.status === 404 && gs.id) { gs.id = ""; store.set("avis-gist", ""); gStatus("Gist non trovato: riprovo al prossimo controllo.", true); }
       else if (e.status) gStatus("Errore GitHub (" + e.status + "): riprova più tardi.", true);
       /* no status = offline: stay silent */
@@ -872,13 +936,14 @@ window.EMBEDDED_HISTORY = window.EMBEDDED_HISTORY || null; /*__EMBEDDED_HISTORY_
     }
   }
   function gSchedule() { clearTimeout(gs.timer); gs.timer = setTimeout(gRun, 2000); }
-  // Called after every local change to list/choices: stamps it, then records habits and pushes once idle.
+  // After every local change: stamp it (monotonic), push after 2 s idle; habits are recorded after 10 s idle or on blur.
   let lt;
   function listEdited() {
-    state.updatedAt = Date.now(); store.set("avis-updated", state.updatedAt);
-    clearTimeout(lt); lt = setTimeout(() => { recordFreq(); gSchedule(); }, 2000);
+    stamp(); gSchedule();
+    clearTimeout(lt); lt = setTimeout(recordFreq, 10000);
   }
-  window.__avisSync = { gs, gRun, state };
+  $("list").addEventListener("blur", () => { clearTimeout(lt); recordFreq(); });
+  window.__avisSync = { gs, gRun, state, recordFreq };
 
   // ---------- events ----------
   $("list").value = state.list;

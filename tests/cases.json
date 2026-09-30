@@ -35,5 +35,6 @@
   {"q":"toiletpapir","notTier1":["Fugtigt"]},
   {"q":"bacon","top":"Bacon","notTier1":["kalkunbacon"]},
   {"q":"kyllingebryst","notTier1":["lårmix"]},
-  {"q":"500g hakkekød","top":"akket","notTier1":["spinat"]}
+  {"q":"500g hakkekød","top":"akket","notTier1":["spinat"]},
+  {"q":"mælk","notTier1":["kakao"]}
 ]

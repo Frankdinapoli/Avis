@@ -281,7 +281,7 @@
     var parts = fold(heading).replace(/\([^)]*\)/g, " ").split(/\s+(?:eller|og)\s+|[,\/&+]/);
     return parts.map(function (p, pi) {
       var toks = p.split(/\s+/).filter(function (t) { return t && t[0] !== "-"; })
-        .map(function (t) { return t.replace(/[^\p{L}\p{N}]+/gu, " ").trim(); }).join(" ").split(" ")
+        .map(function (t) { return t.replace(/(\p{L})-(\p{L})/gu, "$1$2").replace(/[^\p{L}\p{N}]+/gu, " ").trim(); }).join(" ").split(" ")
         .filter(function (t) { return t && !/^\d/.test(t) && !UNITW[t]; });
       var zone = toks.length;
       for (var i = 1; i < toks.length; i++) if (PREPS[toks[i]]) { zone = i; break; }
