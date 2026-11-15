@@ -49,10 +49,15 @@ def trim(o):
     }
 
 
+# Since Nov 2026 the Tjek API answers 401 to urllib's default "Python-urllib" User-Agent.
+USER_AGENT = "AvisTilbud/1.0 (+https://github.com/Frankdinapoli/Avis)"
+
+
 def get_json(url):
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     for attempt in range(3):  # the API occasionally answers 5xx; retry briefly
         try:
-            with urllib.request.urlopen(url, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=30) as r:
                 return json.load(r)
         except urllib.error.HTTPError:
             if attempt == 2:
